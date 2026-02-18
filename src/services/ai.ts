@@ -11,10 +11,10 @@ export const AIService = {
     generateReading: async (data: {
         name: string;
         birthdate: string;
-        lifePath: number;
-        destiny: number;
-        soulUrge: number;
-        personality: number;
+        lifePath: number | string;
+        destiny: number | string;
+        soulUrge: number | string;
+        personality: number | string;
         language?: string;
     }) => {
         try {
@@ -47,7 +47,7 @@ export const AIService = {
     /**
      * Generates an oracle response for a specific question
      */
-    generateOracleResponse: async (question: string, lifePath: number, language: string = 'English') => {
+    generateOracleResponse: async (question: string, lifePath: number | string, language: string = 'English') => {
         try {
             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const prompt = `
@@ -69,7 +69,7 @@ export const AIService = {
     /**
      * Calculates compatibility between two people
      */
-    calculateCompatibility: async (userLifePath: number, partnerBirthdate: string, language: string = 'English') => {
+    calculateCompatibility: async (userLifePath: number | string, partnerBirthdate: string, language: string = 'English') => {
         try {
             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const partnerLP = NumerologyEngine.calculateLifePath(partnerBirthdate);
@@ -93,7 +93,7 @@ export const AIService = {
     /**
      * Generates a daily insight
      */
-    getDailyInsight: async (lifePath: number, language: string = 'English') => {
+    getDailyInsight: async (lifePath: number | string, language: string = 'English') => {
         try {
             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const prompt = `Provide a single, powerful oracle insight for someone with Life Path ${lifePath} for today. One sentence max. RESPONSE LANGUAGE: ${language}`;

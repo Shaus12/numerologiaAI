@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { RevenueCatProvider } from './src/context/RevenueCatContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, MainTabParamList } from './src/navigation/types';
@@ -23,6 +24,7 @@ import { ProfileScreen } from './src/screens/main/ProfileScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
 import { Home, Sparkles, Heart, User } from 'lucide-react-native';
+import { UserProvider, useUser } from './src/context/UserContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -74,8 +76,25 @@ function MainTabNavigator({ route }: any) {
   );
 }
 
-export default function App() {
+const AppContent = () => {
   const [userData, setUserData] = useState<any>({});
+  const { userProfile, numerologyResults, isLoading } = useUser();
+  const [splashFinished, setSplashFinished] = useState(false);
+
+  if (isLoading || !splashFinished) {
+    return (
+      <SplashScreen onFinish={() => setSplashFinished(true)} />
+    );
+  }
+
+  const hasPersistedData = userProfile && numerologyResults;
+  const initialRouteName = hasPersistedData ? "MainTabs" : "Welcome";
+
+  // Prepare params if we have persisted data
+  const initialParams = hasPersistedData ? {
+    ...userProfile,
+    ...numerologyResults
+  } : undefined;
 
   return (
     <NavigationContainer>
@@ -85,10 +104,26 @@ export default function App() {
           headerShown: false,
           animation: 'fade',
         }}
-        initialRouteName="Splash"
+        initialRouteName={initialRouteName}
       >
+        {/* Only show Splash/Onboarding screens if we don't have persisted data, 
+            OR if we want to allow navigation back to them (though replacement usually prevents this).
+            Actually, we should include them so the routes exist. */}
+
         <Stack.Screen name="Splash">
           {(props) => (
+            // If we are here, it means we don't have data (or explicit nav). 
+            // We can just immediately replace since we already showed the splash.
+            // But wait, if initialRouteName is Splash, it will mount this.
+            // And this Splash calls onFinish which replaces with Welcome.
+            // Since we already showed a "loading splash", we might want to skip this one 
+            // and go straight to Welcome? 
+            // Logic: If initialRouteName="Splash", it renders this.
+            // This renders <SplashScreen />. 
+            // Current SplashScreen implementation runs animation then calls onFinish.
+            // If we already waited for splashFinished, showing it AGAIN might be redundant 
+            // but acceptable for "intro". 
+            // Let's keep it simple. If we are starting fresh, show the Splash flow.
             <SplashScreen onFinish={() => props.navigation.replace('Welcome')} />
           )}
         </Stack.Screen>
@@ -215,9 +250,24 @@ export default function App() {
 
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
 
-        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+        <Stack.Screen
+          name="MainTabs"
+          component={MainTabNavigator}
+          initialParams={initialParams}
+        />
 
       </Stack.Navigator>
     </NavigationContainer>
+  );
+};
+
+
+export default function App() {
+  return (
+    <RevenueCatProvider>
+      <UserProvider>
+        <AppContent />
+      </UserProvider>
+    </RevenueCatProvider>
   );
 }

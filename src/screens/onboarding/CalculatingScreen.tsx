@@ -5,12 +5,14 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { Colors } from '../../constants/Colors';
 import { NumerologyEngine } from '../../utils/numerology';
 import { AIService } from '../../services/ai';
+import { useUser } from '../../context/UserContext';
 
 interface CalculatingScreenProps {
     userData: {
         name: string;
         birthdate: string;
         language: string;
+        [key: string]: any;
     };
     onFinish: (results: any) => void;
 }
@@ -26,6 +28,7 @@ const STEPS = [
 export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, onFinish }) => {
     const [stepIndex, setStepIndex] = useState(0);
     const [spinValue] = useState(new Animated.Value(0));
+    const { saveUserProfile, saveNumerologyResults } = useUser();
 
     useEffect(() => {
         // Rotation animation
@@ -62,18 +65,26 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
                 language: userData.language
             });
 
+            const results = {
+                lifePath,
+                destiny,
+                soulUrge,
+                personality,
+                reading,
+                personalYear,
+                dailyNumber
+            };
+
+            // Save to persistence
+            await saveUserProfile(userData);
+            await saveNumerologyResults(results);
+
             // Ensure we stay on screen for at least a few seconds for effect
             setTimeout(() => {
                 onFinish({
                     name: userData.name,
-                    reading,
-                    lifePath,
-                    destiny,
-                    soulUrge,
-                    personality,
+                    ...results,
                     language: userData.language,
-                    personalYear,
-                    dailyNumber
                 });
             }, 6000);
         };

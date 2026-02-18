@@ -4,10 +4,11 @@ import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { Star, User, Calendar, Target, Camera } from 'lucide-react-native';
+import { Star, User, Calendar, Target, Camera, CreditCard } from 'lucide-react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
+import { useRevenueCat } from '../../context/RevenueCatContext';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Profile'>;
 
@@ -24,6 +25,7 @@ export const ProfileScreen: React.FC<Props> = ({ route }) => {
     } = route.params || {};
 
     const [image, setImage] = React.useState<string | null>(null);
+    const { isPro, presentPaywall, presentCustomerCenter } = useRevenueCat();
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,11 +64,26 @@ export const ProfileScreen: React.FC<Props> = ({ route }) => {
                             </View>
                         </TouchableOpacity>
                         <MysticalText variant="h2" style={styles.name}>{name || 'Seeker'}</MysticalText>
-                        <TouchableOpacity style={styles.premiumLabel}>
-                            <Star color={Colors.primary} size={16} fill={Colors.primary} />
-                            <MysticalText style={styles.premiumText}>Premium Member</MysticalText>
-                        </TouchableOpacity>
+
+                        {isPro ? (
+                            <TouchableOpacity style={styles.premiumLabel} onPress={presentCustomerCenter}>
+                                <Star color={Colors.primary} size={16} fill={Colors.primary} />
+                                <MysticalText style={styles.premiumText}>Premium Member</MysticalText>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity style={styles.upgradeButton} onPress={presentPaywall}>
+                                <Star color="#FFF" size={16} strokeWidth={2.5} />
+                                <MysticalText style={styles.upgradeText}>Upgrade to Pro</MysticalText>
+                            </TouchableOpacity>
+                        )}
                     </View>
+
+                    {isPro && (
+                        <TouchableOpacity style={styles.manageSubButton} onPress={presentCustomerCenter}>
+                            <CreditCard color={Colors.textSecondary} size={16} />
+                            <MysticalText style={styles.manageSubText}>Manage Subscription</MysticalText>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.detailsSection}>
                         <DetailItem icon={User} label="Language" value={language || 'English'} />
@@ -113,7 +130,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     safe: { flex: 1 },
     scroll: { padding: 25 },
-    header: { alignItems: 'center', marginBottom: 30 },
+    header: { alignItems: 'center', marginBottom: 20 },
     avatarBorder: {
         width: 100,
         height: 100,
@@ -150,17 +167,46 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: Colors.background,
     },
-    name: { marginBottom: 8 },
+    name: { marginBottom: 12 },
     premiumLabel: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(212, 175, 55, 0.1)',
         paddingHorizontal: 15,
-        paddingVertical: 5,
+        paddingVertical: 8,
         borderRadius: 20,
         gap: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
     },
     premiumText: { color: Colors.primary, fontWeight: '700', fontSize: 13 },
+    upgradeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
+        gap: 8,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    upgradeText: { color: '#000', fontWeight: '700', fontSize: 14 },
+    manageSubButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 20,
+        padding: 10,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 12,
+        alignSelf: 'center',
+    },
+    manageSubText: { color: Colors.textSecondary, fontSize: 12 },
     detailsSection: { gap: 12, marginBottom: 30 },
     detailItem: {
         flexDirection: 'row',

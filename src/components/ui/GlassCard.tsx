@@ -3,7 +3,7 @@ import { View, StyleSheet, ViewProps } from 'react-native';
 import { Colors } from '../../constants/Colors';
 
 interface GlassCardProps extends ViewProps {
-    children: React.Node;
+    children: React.ReactNode;
     border?: boolean;
 }
 

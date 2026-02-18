@@ -13,23 +13,23 @@ export type RootStackParamList = {
     Expectations: undefined;
     AnalysisComplete: {
         reading: string;
-        lifePath: number;
-        destiny: number;
-        soulUrge: number;
-        personality: number;
+        lifePath: number | string;
+        destiny: number | string;
+        soulUrge: number | string;
+        personality: number | string;
         language: string;
-        personalYear: number;
-        dailyNumber: number;
+        personalYear: number | string;
+        dailyNumber: number | string;
     };
     MainTabs: {
         reading: string;
-        lifePath: number;
-        destiny: number;
-        soulUrge: number;
-        personality: number;
+        lifePath: number | string;
+        destiny: number | string;
+        soulUrge: number | string;
+        personality: number | string;
         language: string;
-        personalYear: number;
-        dailyNumber: number;
+        personalYear: number | string;
+        dailyNumber: number | string;
     };
 };
 
@@ -37,31 +37,31 @@ export type MainTabParamList = {
     Home: {
         name: string;
         reading: string;
-        lifePath: number;
-        destiny: number;
-        soulUrge: number;
-        personality: number;
+        lifePath: number | string;
+        destiny: number | string;
+        soulUrge: number | string;
+        personality: number | string;
         language: string;
-        personalYear: number;
-        dailyNumber: number;
+        personalYear: number | string;
+        dailyNumber: number | string;
     };
     Oracle: {
-        lifePath: number;
+        lifePath: number | string;
         language: string;
     };
     Match: {
-        lifePath: number;
+        lifePath: number | string;
         language: string;
     };
     Profile: {
         name: string;
         reading: string;
-        lifePath: number;
-        destiny: number;
-        soulUrge: number;
-        personality: number;
+        lifePath: number | string;
+        destiny: number | string;
+        soulUrge: number | string;
+        personality: number | string;
         language: string;
-        personalYear: number;
-        dailyNumber: number;
+        personalYear: number | string;
+        dailyNumber: number | string;
     };
 };
