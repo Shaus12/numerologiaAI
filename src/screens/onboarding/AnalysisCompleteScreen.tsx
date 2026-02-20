@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView, BackHandler } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
@@ -9,6 +9,7 @@ import { ChevronRight, Lock, Share } from 'lucide-react-native';
 import { Share as RNShare } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useRevenueCat } from '../../context/RevenueCatContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
@@ -16,6 +17,24 @@ import { NotificationService } from '../../services/notificationService';
 
 export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) => {
     const { lifePath } = route.params;
+    const { presentPaywall } = useRevenueCat();
+
+    // Block hardware back button - user must subscribe
+    React.useEffect(() => {
+        const handler = BackHandler.addEventListener('hardwareBackPress', () => true);
+        return () => handler.remove();
+    }, []);
+
+    // Directly handle the CTA tap — no state-timing race
+    const handleClaimTrial = async () => {
+        const purchased = await presentPaywall();
+        if (purchased) {
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs', params: route.params }],
+            });
+        }
+    };
 
     const handleShare = async () => {
         try {
@@ -58,10 +77,6 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                             You are destined for material success and authority. Your path involves manifesting abundance and wielding power wisely.
                         </MysticalText>
 
-                        <TouchableOpacity style={styles.shareAnalysisBtn} onPress={handleShare}>
-                            <Share size={16} color={Colors.secondary} style={{ marginRight: 8 }} />
-                            <MysticalText variant="caption" style={styles.shareText}>SHARE MY PATH</MysticalText>
-                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.lockedSection}>
@@ -83,16 +98,16 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
 
                     <View style={styles.footer}>
                         <Button
-                            title="Claim Your 7-Day Free Access"
-                            onPress={() => {
-                                // Navigate to Tabs first (so they are active in bg) then Paywall modal on top
-                                navigation.navigate('MainTabs', route.params);
-                                setTimeout(() => navigation.navigate('Paywall'), 100);
-                            }}
+                            title="Claim Your 7-Day Free Trial"
+                            onPress={handleClaimTrial}
                         />
                         <MysticalText variant="caption" style={styles.footerNote}>
-                            25+ pages of personalized insights
+                            25+ pages of personalized insights • Cancel anytime
                         </MysticalText>
+                        <TouchableOpacity style={styles.shareAnalysisBtn} onPress={handleShare}>
+                            <Share size={15} color={Colors.secondary} style={{ marginRight: 8 }} />
+                            <MysticalText variant="caption" style={styles.shareText}>SHARE MY PATH</MysticalText>
+                        </TouchableOpacity>
                     </View>
                 </ScrollView>
             </SafeAreaView>

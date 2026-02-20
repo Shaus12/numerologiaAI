@@ -10,23 +10,25 @@ import { MainTabParamList } from '../../navigation/types';
 import { Sparkles, ChevronRight } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
 import { useSettings } from '../../context/SettingsContext';
+import { useUser } from '../../context/UserContext';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
-    route: { params: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
+    route: { params?: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
 };
 
 export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
-    const {
-        name,
-        lifePath,
-        destiny,
-        soulUrge,
-        personality,
-        personalYear,
-        dailyNumber,
-    } = route.params;
-
     const { language, t } = useSettings();
+    const { userProfile, numerologyResults } = useUser();
+
+    // Use context (persistent) data as primary, route.params as fallback for fresh navigation
+    const name = userProfile?.name ?? route.params?.name ?? t('seeker');
+    const lifePath = numerologyResults?.lifePath ?? route.params?.lifePath ?? 0;
+    const destiny = numerologyResults?.destiny ?? route.params?.destiny ?? 0;
+    const soulUrge = numerologyResults?.soulUrge ?? route.params?.soulUrge ?? 0;
+    const personality = numerologyResults?.personality ?? route.params?.personality ?? 0;
+    const personalYear = numerologyResults?.personalYear ?? route.params?.personalYear ?? 0;
+    const dailyNumber = numerologyResults?.dailyNumber ?? route.params?.dailyNumber ?? 0;
+
 
     const [dailyInsight, setDailyInsight] = React.useState<string>(t('dailyInsight'));
     const [loadingInsight, setLoadingInsight] = React.useState(true);
@@ -88,7 +90,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
 
                     {/* Header Section */}
                     <View style={styles.header}>
-                        <MysticalText style={styles.welcomeText}>{t('welcomeBack')}</MysticalText>
+                        <MysticalText style={styles.welcomeText}>Welcome back !!!</MysticalText>
                         <MysticalText variant="h1" style={styles.nameText}>{name || t('seeker')}</MysticalText>
                         <MysticalText style={styles.dateText}>{formattedDate}</MysticalText>
                     </View>

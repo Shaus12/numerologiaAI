@@ -6,7 +6,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Button } from '../../components/ui/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Heart, Sparkles } from 'lucide-react-native';
+import { Heart, Sparkles, ArrowLeft, Lock } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
 import { useSettings } from '../../context/SettingsContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
@@ -14,10 +14,6 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { PurchasesPackage } from 'react-native-purchases';
-import Purchases from 'react-native-purchases';
-import { ActivityIndicator } from 'react-native';
-import { ArrowLeft, Lock } from 'lucide-react-native';
 import { useUser } from '../../context/UserContext';
 
 type Props = CompositeScreenProps<
@@ -30,10 +26,13 @@ import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, Eas
 type MatchStep = 'input' | 'scanning' | 'result';
 
 export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
-    const { lifePath } = route.params;
     const { language, t } = useSettings();
     const { isPro, purchasePackage } = useRevenueCat();
     const { userProfile, numerologyResults } = useUser();
+
+    // Use context (persistent) data as primary, route.params as fallback
+    const lifePath = numerologyResults?.lifePath ?? route.params?.lifePath ?? 0;
+
 
     // Hooks must be called unconditionally
     const [step, setStep] = useState<MatchStep>('input');
@@ -48,26 +47,22 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     }));
 
     const handleBack = () => {
-        if (userProfile && numerologyResults) {
-            navigation.navigate('Home', {
-                name: userProfile.name,
-                language: language,
-                reading: numerologyResults.reading || '',
-                lifePath: numerologyResults.lifePath,
-                destiny: numerologyResults.destiny,
-                soulUrge: numerologyResults.soulUrge,
-                personality: numerologyResults.personality,
-                personalYear: numerologyResults.personalYear || 0,
-                dailyNumber: numerologyResults.dailyNumber || 0,
-            });
-        } else {
-            navigation.goBack();
-        }
+        navigation.navigate('Home', {
+            name: userProfile?.name ?? '',
+            language: language,
+            reading: numerologyResults?.reading ?? '',
+            lifePath: lifePath,
+            destiny: numerologyResults?.destiny ?? 0,
+            soulUrge: numerologyResults?.soulUrge ?? 0,
+            personality: numerologyResults?.personality ?? 0,
+            personalYear: numerologyResults?.personalYear ?? 0,
+            dailyNumber: numerologyResults?.dailyNumber ?? 0,
+        });
     };
 
     // Conditional return AFTER hooks
     if (!isPro) {
-        return <MatchPaywallOverlay onBack={handleBack} purchasePackage={purchasePackage} />;
+        return <MatchPaywallOverlay onBack={handleBack} />;
     }
 
     const handleStartScan = async () => {
@@ -171,34 +166,8 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     );
 };
 
-const MatchPaywallOverlay = ({ onBack, purchasePackage }: { onBack: () => void, purchasePackage: (pkg: PurchasesPackage) => Promise<void> }) => {
-    const [pkg, setPkg] = useState<PurchasesPackage | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    React.useEffect(() => {
-        const loadOfferings = async () => {
-            try {
-                const offerings = await Purchases.getOfferings();
-                if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
-                    setPkg(offerings.current.availablePackages[0]);
-                }
-            } catch (e) {
-                console.error('Error fetching offerings:', e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadOfferings();
-    }, []);
-
-    const handlePurchase = async () => {
-        if (!pkg) return;
-        try {
-            await purchasePackage(pkg);
-        } catch (e) {
-            console.log('Purchase cancelled or failed');
-        }
-    };
+const MatchPaywallOverlay = ({ onBack }: { onBack: () => void }) => {
+    const { presentPaywall } = useRevenueCat();
 
     return (
         <GradientBackground>
@@ -222,25 +191,16 @@ const MatchPaywallOverlay = ({ onBack, purchasePackage }: { onBack: () => void, 
                             Start your 7-day free trial to align your vibrations with another soul.
                         </MysticalText>
 
-                        {loading ? (
-                            <ActivityIndicator color={Colors.primary} />
-                        ) : (
-                            <View style={styles.offerContainer}>
-                                <MysticalText style={styles.priceText}>
-                                    Free for 7 days, then {pkg?.product.priceString}/month
-                                </MysticalText>
-
-                                <Button
-                                    title="Start Your 7-Day Free Trial"
-                                    onPress={handlePurchase}
-                                    style={styles.paywallBtn}
-                                />
-
-                                <MysticalText variant="caption" style={styles.cancelText}>
-                                    Cancel anytime.
-                                </MysticalText>
-                            </View>
-                        )}
+                        <View style={styles.offerContainer}>
+                            <Button
+                                title="Start Your 7-Day Free Trial"
+                                onPress={presentPaywall}
+                                style={styles.paywallBtn}
+                            />
+                            <MysticalText variant="caption" style={styles.cancelText}>
+                                Cancel anytime.
+                            </MysticalText>
+                        </View>
                     </View>
                 </View>
             </SafeAreaView>

@@ -26,14 +26,17 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
 import { Home, Sparkles, Heart, User } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { useRevenueCat } from './src/context/RevenueCatContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { SettingsScreen } from './src/screens/settings/SettingsScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabNavigator({ route }: any) {
-  const results = route.params;
+  const results = route.params || {};
 
   return (
     <Tab.Navigator
@@ -81,10 +84,11 @@ function MainTabNavigator({ route }: any) {
 
 const AppContent = (props: { navigationRef: any }) => {
   const [userData, setUserData] = useState<any>({});
-  const { userProfile, numerologyResults, isLoading } = useUser();
+  const { userProfile, numerologyResults, isLoading: isUserLoading } = useUser();
+  const { isLoading: isRcLoading } = useRevenueCat();
   const [splashFinished, setSplashFinished] = useState(false);
 
-  if (isLoading || !splashFinished) {
+  if (isUserLoading || isRcLoading || !splashFinished) {
     return (
       <SplashScreen onFinish={() => setSplashFinished(true)} />
     );
@@ -275,6 +279,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -297,12 +303,16 @@ export default function App() {
   }, []);
 
   return (
-    <RevenueCatProvider>
-      <UserProvider>
-        <SettingsProvider>
-          <AppContent navigationRef={navigationRef} />
-        </SettingsProvider>
-      </UserProvider>
-    </RevenueCatProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <RevenueCatProvider>
+          <UserProvider>
+            <SettingsProvider>
+              <AppContent navigationRef={navigationRef} />
+            </SettingsProvider>
+          </UserProvider>
+        </RevenueCatProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

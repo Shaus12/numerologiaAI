@@ -23,21 +23,21 @@ type Props = CompositeScreenProps<
 >;
 
 export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
-    const {
-        name,
-        lifePath,
-        destiny,
-        soulUrge,
-        personality,
-        personalYear,
-        dailyNumber,
-    } = route.params || {};
-
     const { language, t } = useSettings();
-    const { clearUserData } = useUser();
+    const { clearUserData, userProfile, numerologyResults } = useUser();
+
+    // Use context (persistent) data as primary, route.params as fallback
+    const name = userProfile?.name ?? route.params?.name;
+    const lifePath = numerologyResults?.lifePath ?? route.params?.lifePath;
+    const destiny = numerologyResults?.destiny ?? route.params?.destiny;
+    const soulUrge = numerologyResults?.soulUrge ?? route.params?.soulUrge;
+    const personality = numerologyResults?.personality ?? route.params?.personality;
+    const personalYear = numerologyResults?.personalYear ?? route.params?.personalYear;
+    const dailyNumber = numerologyResults?.dailyNumber ?? route.params?.dailyNumber;
 
     const [image, setImage] = React.useState<string | null>(null);
     const { isPro, presentPaywall, presentCustomerCenter } = useRevenueCat();
+
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
 
     useFocusEffect(
@@ -83,6 +83,23 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         if (!result.canceled) {
             setImage(result.assets[0].uri);
         }
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            t('deleteAccount') || 'Delete Account',
+            t('deleteConfirm') || 'Are you sure you want to delete your account? This action cannot be undone.',
+            [
+                { text: t('cancel') || 'Cancel', style: 'cancel' },
+                {
+                    text: t('delete') || 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await clearUserData();
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -131,7 +148,6 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         </TouchableOpacity>
 
                         <DetailItem icon={User} label={t('language')} value={language || 'English'} />
-                        <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
                         <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
                         <DetailItem icon={Target} label={t('dailyFocus')} value={`${t('vibration')} ${dailyNumber || 0}`} />
 

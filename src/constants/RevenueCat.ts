@@ -1,5 +1,5 @@
 export const RevenueCatConfig = {
-    apiKey: 'test_wsdoudVfvuYQjkhRLYRewXkFvKX', // Replace with production key when ready
-    entitlementId: 'NumerologiaAI Pro',
+    apiKey: 'appl_SmJjaqyZNvkmVqedErwWHwQNnBI', // Production iOS key
+    entitlementId: 'Premium_Access',
     offeringId: 'default', // Using the default offering
 };

@@ -30,11 +30,12 @@ interface Message {
 }
 
 export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
-    const { lifePath } = route.params;
     const { language, t } = useSettings();
     const { isPro, purchasePackage } = useRevenueCat();
     const { userProfile, numerologyResults } = useUser();
-    // Removed useFocusEffect redirect loop
+
+    // Use context (persistent) data as primary, route.params as fallback
+    const lifePath = numerologyResults?.lifePath ?? route.params?.lifePath ?? 0;
 
     const [messages, setMessages] = useState<Message[]>([
         { id: '1', text: t('oracleGreeting'), sender: 'oracle' }
@@ -109,25 +110,21 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     };
 
     const handleBack = () => {
-        if (userProfile && numerologyResults) {
-            navigation.navigate('Home', {
-                name: userProfile.name,
-                language: language,
-                reading: numerologyResults.reading || '',
-                lifePath: numerologyResults.lifePath,
-                destiny: numerologyResults.destiny,
-                soulUrge: numerologyResults.soulUrge,
-                personality: numerologyResults.personality,
-                personalYear: numerologyResults.personalYear || 0,
-                dailyNumber: numerologyResults.dailyNumber || 0,
-            });
-        } else {
-            navigation.goBack();
-        }
+        navigation.navigate('Home', {
+            name: userProfile?.name ?? '',
+            language: language,
+            reading: numerologyResults?.reading ?? '',
+            lifePath: lifePath,
+            destiny: numerologyResults?.destiny ?? 0,
+            soulUrge: numerologyResults?.soulUrge ?? 0,
+            personality: numerologyResults?.personality ?? 0,
+            personalYear: numerologyResults?.personalYear ?? 0,
+            dailyNumber: numerologyResults?.dailyNumber ?? 0,
+        });
     };
 
     if (!isPro) {
-        return <OraclePaywallOverlay onBack={handleBack} purchasePackage={purchasePackage} />;
+        return <OraclePaywallOverlay onBack={handleBack} />;
     }
 
     return (
@@ -253,34 +250,8 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     );
 };
 
-const OraclePaywallOverlay = ({ onBack, purchasePackage }: { onBack: () => void, purchasePackage: (pkg: PurchasesPackage) => Promise<void> }) => {
-    const [pkg, setPkg] = useState<PurchasesPackage | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadOfferings = async () => {
-            try {
-                const offerings = await Purchases.getOfferings();
-                if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
-                    setPkg(offerings.current.availablePackages[0]);
-                }
-            } catch (e) {
-                console.error('Error fetching offerings:', e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadOfferings();
-    }, []);
-
-    const handlePurchase = async () => {
-        if (!pkg) return;
-        try {
-            await purchasePackage(pkg);
-        } catch (e) {
-            console.log('Purchase cancelled or failed');
-        }
-    };
+const OraclePaywallOverlay = ({ onBack }: { onBack: () => void }) => {
+    const { presentPaywall } = useRevenueCat();
 
     return (
         <GradientBackground>
@@ -304,31 +275,23 @@ const OraclePaywallOverlay = ({ onBack, purchasePackage }: { onBack: () => void,
                             Start your 7-day free trial to consult the Oracle and reveal your destiny.
                         </MysticalText>
 
-                        {loading ? (
-                            <ActivityIndicator color={Colors.primary} />
-                        ) : (
-                            <View style={styles.offerContainer}>
-                                <MysticalText style={styles.priceText}>
-                                    Free for 7 days, then {pkg?.product.priceString}/month
-                                </MysticalText>
-
-                                <Button
-                                    title="Start Your 7-Day Free Trial"
-                                    onPress={handlePurchase}
-                                    style={styles.paywallBtn}
-                                />
-
-                                <MysticalText variant="caption" style={styles.cancelText}>
-                                    Cancel anytime.
-                                </MysticalText>
-                            </View>
-                        )}
+                        <View style={styles.offerContainer}>
+                            <Button
+                                title="Start Your 7-Day Free Trial"
+                                onPress={presentPaywall}
+                                style={styles.paywallBtn}
+                            />
+                            <MysticalText variant="caption" style={styles.cancelText}>
+                                Cancel anytime.
+                            </MysticalText>
+                        </View>
                     </View>
                 </View>
             </SafeAreaView>
         </GradientBackground>
     );
 };
+
 
 const PresetBtn = ({ text, onPress }: { text: string; onPress: () => void }) => (
     <TouchableOpacity style={styles.presetBtn} onPress={onPress}>

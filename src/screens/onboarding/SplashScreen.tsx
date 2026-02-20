@@ -63,9 +63,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#ffffff', // First screenshot show white splash?? Actually no, let's re-examine.
+        backgroundColor: '#ffffff',
     },
     content: {
         alignItems: 'center',

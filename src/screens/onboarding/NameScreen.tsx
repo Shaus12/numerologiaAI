@@ -15,6 +15,7 @@ import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const NameScreen: React.FC<NameScreenProps> = ({ onContinue, onBack }) => {
     const [name, setName] = useState('');
+    const [isFocused, setIsFocused] = useState(false);
 
     return (
         <GradientBackground style={styles.container}>

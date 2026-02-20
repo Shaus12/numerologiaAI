@@ -10,7 +10,7 @@ interface RevenueCatContextType {
     isLoading: boolean;
     purchasePackage: (pack: PurchasesPackage) => Promise<void>;
     restorePurchases: () => Promise<CustomerInfo | null>;
-    presentPaywall: () => Promise<void>;
+    presentPaywall: () => Promise<boolean>;
     presentCustomerCenter: () => Promise<void>;
 }
 
@@ -32,14 +32,18 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const isPro = customerInfo?.entitlements.active[RevenueCatConfig.entitlementId] !== undefined;
+    const isPro = customerInfo?.entitlements.active[RevenueCatConfig.entitlementId] !== undefined ||
+        Object.keys(customerInfo?.entitlements.active || {}).length > 0;
 
     useEffect(() => {
         const init = async () => {
             try {
                 if (Platform.OS === 'android' || Platform.OS === 'ios') {
                     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-                    Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+                    const isConfigured = await Purchases.isConfigured();
+                    if (!isConfigured) {
+                        Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+                    }
 
                     const info = await Purchases.getCustomerInfo();
                     console.log('RevenueCat Init - CustomerInfo:', JSON.stringify(info, null, 2));
@@ -74,10 +78,8 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
             console.log('Purchase Successful - CustomerInfo:', JSON.stringify(customerInfo, null, 2));
             setCustomerInfo(customerInfo);
         } catch (e: any) {
-            if (!e.userCancelled) {
-                console.error('Purchase error:', e);
-                throw e;
-            }
+            console.error('Purchase error:', e);
+            throw e;
         }
     };
 
@@ -92,30 +94,26 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         }
     };
 
-    const presentPaywall = async () => {
+    const presentPaywall = async (): Promise<boolean> => {
         try {
-            // Using RevenueCatUI to present the paywall as a modal
-            // This leverages the native-like experience provided by the UI library
             const result = await RevenueCatUI.presentPaywallIfNeeded({
-                requiredEntitlementIdentifier: RevenueCatConfig.entitlementId
+                requiredEntitlementIdentifier: RevenueCatConfig.entitlementId,
             });
 
-            switch (result) {
-                case RevenueCatUI.PAYWALL_RESULT.PURCHASED:
-                case RevenueCatUI.PAYWALL_RESULT.RESTORED:
-                    // Refresh customer info just in case, though the listener should catch it
-                    const info = await Purchases.getCustomerInfo();
-                    setCustomerInfo(info);
-                    break;
-                case RevenueCatUI.PAYWALL_RESULT.CANCELLED:
-                    // User closed paywall
-                    break;
-                default:
-                    break;
-            }
+            const success =
+                result === RevenueCatUI.PAYWALL_RESULT.PURCHASED ||
+                result === RevenueCatUI.PAYWALL_RESULT.RESTORED ||
+                result === RevenueCatUI.PAYWALL_RESULT.NOT_PRESENTED; // NOT_PRESENTED = already subscribed
 
+            if (success) {
+                // Immediately refresh and update global state
+                const info = await Purchases.getCustomerInfo();
+                setCustomerInfo(info);
+            }
+            return success;
         } catch (e) {
             console.error('Paywall presentation error:', e);
+            return false;
         }
     };
 
