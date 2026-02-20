@@ -4,15 +4,25 @@ import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { Star, User, Calendar, Target, Camera, CreditCard } from 'lucide-react-native';
+import { Star, User, Calendar, Target, Camera, CreditCard, Settings, Shield, Trash2 } from 'lucide-react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '../../navigation/types';
+import { RootStackParamList, MainTabParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
 import { useRevenueCat } from '../../context/RevenueCatContext';
+import { useSettings } from '../../context/SettingsContext';
+import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
+import { StackScreenProps } from '@react-navigation/stack';
+import { Switch } from 'react-native';
+import { NotificationService } from '../../services/notificationService';
+import Purchases from 'react-native-purchases';
+import { useUser } from '../../context/UserContext';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Profile'>;
+type Props = CompositeScreenProps<
+    BottomTabScreenProps<MainTabParamList, 'Profile'>,
+    StackScreenProps<RootStackParamList>
+>;
 
-export const ProfileScreen: React.FC<Props> = ({ route }) => {
+export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     const {
         name,
         lifePath,
@@ -21,11 +31,40 @@ export const ProfileScreen: React.FC<Props> = ({ route }) => {
         personality,
         personalYear,
         dailyNumber,
-        language
     } = route.params || {};
+
+    const { language, t } = useSettings();
+    const { clearUserData } = useUser();
 
     const [image, setImage] = React.useState<string | null>(null);
     const { isPro, presentPaywall, presentCustomerCenter } = useRevenueCat();
+    const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const checkPermissions = async () => {
+                const hasPerms = await NotificationService.hasPermissions();
+                setNotificationsEnabled(hasPerms);
+            };
+            checkPermissions();
+        }, [])
+    );
+
+    const toggleNotifications = async (value: boolean) => {
+        if (value) {
+            const granted = await NotificationService.requestPermissions();
+            if (granted) {
+                await NotificationService.scheduleDailyReminder();
+                setNotificationsEnabled(true);
+            } else {
+                setNotificationsEnabled(false);
+                Alert.alert(t('permissionNeeded'), t('enableNotificationsSettings'));
+            }
+        } else {
+            await NotificationService.cancelAllNotifications();
+            setNotificationsEnabled(false);
+        }
+    };
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -68,12 +107,12 @@ export const ProfileScreen: React.FC<Props> = ({ route }) => {
                         {isPro ? (
                             <TouchableOpacity style={styles.premiumLabel} onPress={presentCustomerCenter}>
                                 <Star color={Colors.primary} size={16} fill={Colors.primary} />
-                                <MysticalText style={styles.premiumText}>Premium Member</MysticalText>
+                                <MysticalText style={styles.premiumText}>{t('premiumMember')}</MysticalText>
                             </TouchableOpacity>
                         ) : (
                             <TouchableOpacity style={styles.upgradeButton} onPress={presentPaywall}>
                                 <Star color="#FFF" size={16} strokeWidth={2.5} />
-                                <MysticalText style={styles.upgradeText}>Upgrade to Pro</MysticalText>
+                                <MysticalText style={styles.upgradeText}>{t('upgradePro')}</MysticalText>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -81,26 +120,67 @@ export const ProfileScreen: React.FC<Props> = ({ route }) => {
                     {isPro && (
                         <TouchableOpacity style={styles.manageSubButton} onPress={presentCustomerCenter}>
                             <CreditCard color={Colors.textSecondary} size={16} />
-                            <MysticalText style={styles.manageSubText}>Manage Subscription</MysticalText>
+                            <MysticalText style={styles.manageSubText}>{t('manageSubscription')}</MysticalText>
                         </TouchableOpacity>
                     )}
 
                     <View style={styles.detailsSection}>
-                        <DetailItem icon={User} label="Language" value={language || 'English'} />
-                        <DetailItem icon={Calendar} label="Personal Year" value={personalYear?.toString() || '0'} />
-                        <DetailItem icon={Target} label="Daily Focus" value={`Vibration ${dailyNumber || 0}`} />
+                        <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+                            <Settings color={Colors.textSecondary} size={20} />
+                            <MysticalText style={styles.settingsText}>{t('settings')}</MysticalText>
+                        </TouchableOpacity>
+
+                        <DetailItem icon={User} label={t('language')} value={language || 'English'} />
+                        <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
+                        <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
+                        <DetailItem icon={Target} label={t('dailyFocus')} value={`${t('vibration')} ${dailyNumber || 0}`} />
+
+                        <GlassCard style={styles.detailItem}>
+                            <View style={styles.iconBox}>
+                                <Star color={Colors.primary} size={20} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <MysticalText variant="body" style={styles.detailValue}>{t('dailyReminders')}</MysticalText>
+                            </View>
+                            <Switch
+                                value={notificationsEnabled}
+                                onValueChange={toggleNotifications}
+                                trackColor={{ false: '#767577', true: Colors.primary }}
+                                thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
+                            />
+                        </GlassCard>
+
+                        <TouchableOpacity
+                            style={styles.settingsButton}
+                            onPress={() => Alert.alert(t('privacyPolicy'), 'Privacy policy link placeholder.')}
+                        >
+                            <Shield color={Colors.textSecondary} size={20} />
+                            <MysticalText style={styles.settingsText}>{t('privacyPolicy')}</MysticalText>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.settingsButton, styles.deleteButton]}
+                            onPress={handleDeleteAccount}
+                        >
+                            <Trash2 color="#FF453A" size={20} />
+                            <MysticalText style={[styles.settingsText, styles.deleteText]}>{t('deleteAccount') || 'Delete Account'}</MysticalText>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.numbersSection}>
-                        <MysticalText variant="subtitle" style={styles.sectionTitle}>YOUR CORE NUMBERS</MysticalText>
+                        <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('coreNumbers')}</MysticalText>
                         <View style={styles.grid}>
-                            <CoreNumber label="Life Path" value={lifePath?.toString() || '0'} />
-                            <CoreNumber label="Destiny" value={destiny?.toString() || '0'} color={Colors.secondary} />
-                            <CoreNumber label="Soul Urge" value={soulUrge?.toString() || '0'} color="#3498db" />
-                            <CoreNumber label="Personality" value={personality?.toString() || '0'} color="#e74c3c" />
-                            <CoreNumber label="Daily" value={dailyNumber?.toString() || '0'} color="#2ecc71" />
+                            <CoreNumber label={t('lifePath')} value={lifePath?.toString() || '0'} />
+                            <CoreNumber label={t('destiny')} value={destiny?.toString() || '0'} color={Colors.secondary} />
+                            <CoreNumber label={t('soulUrge')} value={soulUrge?.toString() || '0'} color="#3498db" />
+                            <CoreNumber label={t('personality')} value={personality?.toString() || '0'} color="#e74c3c" />
+                            <CoreNumber label={t('dailyNumber')} value={dailyNumber?.toString() || '0'} color="#2ecc71" />
                         </View>
                     </View>
+
+                    <MysticalText variant="caption" style={styles.disclaimerText}>
+                        {t('disclaimer')}
+                    </MysticalText>
                 </ScrollView>
             </SafeAreaView>
         </GradientBackground>
@@ -121,7 +201,7 @@ const DetailItem = ({ icon: Icon, label, value }: { icon: any; label: string; va
 
 const CoreNumber = ({ label, value, color = Colors.primary }: { label: string; value: string; color?: string }) => (
     <GlassCard style={styles.numberCard}>
-        <MysticalText style={[styles.numberValue, { color }]}>{value}</MysticalText>
+        <MysticalText style={[styles.numberValue, { color, lineHeight: 34 }]}>{value}</MysticalText>
         <MysticalText variant="caption" style={styles.numberLabel}>{label}</MysticalText>
     </GlassCard>
 );
@@ -207,6 +287,19 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
     },
     manageSubText: { color: Colors.textSecondary, fontSize: 12 },
+    settingsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 15,
+        borderRadius: 12,
+        marginBottom: 10,
+    },
+    settingsText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
     detailsSection: { gap: 12, marginBottom: 30 },
     detailItem: {
         flexDirection: 'row',
@@ -246,4 +339,21 @@ const styles = StyleSheet.create({
     },
     numberValue: { fontSize: 28, fontWeight: '700' },
     numberLabel: { marginTop: 4, textAlign: 'center' },
+    disclaimerText: {
+        textAlign: 'center',
+        marginTop: 40,
+        marginBottom: 20,
+        opacity: 0.4,
+        fontSize: 11,
+        lineHeight: 16,
+    },
+    deleteButton: {
+        marginTop: 20,
+        borderColor: 'rgba(255, 69, 58, 0.3)',
+        borderWidth: 1,
+        backgroundColor: 'rgba(255, 69, 58, 0.05)',
+    },
+    deleteText: {
+        color: '#FF453A',
+    }
 });

@@ -1,5 +1,7 @@
 export type RootStackParamList = {
     Splash: undefined;
+    Settings: undefined;
+    Paywall: undefined;
     Welcome: undefined;
     Language: undefined;
     Identity: undefined;

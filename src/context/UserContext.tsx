@@ -97,8 +97,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const clearUserData = async () => {
     try {
-      await AsyncStorage.removeItem('userProfile');
-      await AsyncStorage.removeItem('numerologyResults');
+      await AsyncStorage.clear();
       setUserProfile(null);
       setNumerologyResults(null);
     } catch (error) {

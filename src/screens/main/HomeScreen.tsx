@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -8,8 +9,11 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../../navigation/types';
 import { Sparkles, ChevronRight } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
+import { useSettings } from '../../context/SettingsContext';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
+type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
+    route: { params: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
+};
 
 export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const {
@@ -20,19 +24,42 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         personality,
         personalYear,
         dailyNumber,
-        language
     } = route.params;
 
-    const [dailyInsight, setDailyInsight] = React.useState<string>("Your cosmic journey awaits...");
+    const { language, t } = useSettings();
+
+    const [dailyInsight, setDailyInsight] = React.useState<string>(t('dailyInsight'));
     const [loadingInsight, setLoadingInsight] = React.useState(true);
+    const scrollViewRef = React.useRef<ScrollView>(null);
+
+    React.useEffect(() => {
+        if (route.params?.openDailyInsight) {
+            scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+        }
+    }, [route.params?.openDailyInsight]);
 
     React.useEffect(() => {
         const fetchInsight = async () => {
+            const todayKey = new Date().toISOString().split('T')[0];
+            const cacheKey = `daily_insight_${lifePath}_${language}_${todayKey}`;
+
             try {
+                // Check cache first
+                const cached = await AsyncStorage.getItem(cacheKey);
+                if (cached) {
+                    setDailyInsight(cached);
+                    setLoadingInsight(false);
+                    return;
+                }
+
+                // If not cached, fetch from AI
                 const insight = await AIService.getDailyInsight(lifePath, language);
-                setDailyInsight(insight);
+                if (insight) {
+                    setDailyInsight(insight);
+                    await AsyncStorage.setItem(cacheKey, insight);
+                }
             } catch (error) {
-                console.error(error);
+                console.error('Insight fetch error:', error);
             } finally {
                 setLoadingInsight(false);
             }
@@ -53,12 +80,16 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     return (
         <GradientBackground>
             <SafeAreaView style={styles.safe}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    ref={scrollViewRef}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
 
                     {/* Header Section */}
                     <View style={styles.header}>
-                        <MysticalText style={styles.welcomeText}>Welcome back,</MysticalText>
-                        <MysticalText variant="h1" style={styles.nameText}>{name || 'Seeker'}</MysticalText>
+                        <MysticalText style={styles.welcomeText}>{t('welcomeBack')}</MysticalText>
+                        <MysticalText variant="h1" style={styles.nameText}>{name || t('seeker')}</MysticalText>
                         <MysticalText style={styles.dateText}>{formattedDate}</MysticalText>
                     </View>
 
@@ -66,33 +97,33 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     <GlassCard style={styles.cosmicCard}>
                         <View style={styles.cosmicHeader}>
                             <Sparkles color={Colors.primary} size={18} />
-                            <MysticalText variant="subtitle" style={styles.cosmicTitle}>Cosmic Message for Today</MysticalText>
+                            <MysticalText variant="subtitle" style={styles.cosmicTitle}>{t('cosmicMessage')}</MysticalText>
                         </View>
                         <MysticalText variant="body" style={styles.cosmicContent}>
-                            {loadingInsight ? "Consulting the stars..." : dailyInsight}
+                            {loadingInsight ? t('consultingStars') : dailyInsight}
                         </MysticalText>
                     </GlassCard>
 
                     {/* YOUR NUMBERS Section */}
                     <View style={styles.section}>
-                        <MysticalText variant="subtitle" style={styles.sectionTitle}>YOUR NUMBERS</MysticalText>
+                        <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('yourNumbers')}</MysticalText>
                         <View style={styles.numbersGrid}>
                             <NumberCard
                                 value={personalYear}
-                                label="Personal Year"
-                                sub="Year of transformation"
+                                label={t('personalYear')}
+                                sub={t('yearTransformation')}
                                 color={Colors.secondary}
                             />
                             <NumberCard
                                 value={dailyNumber}
-                                label="Daily Number"
-                                sub="Energy today"
+                                label={t('dailyNumber')}
+                                sub={t('energyToday')}
                                 color={Colors.primary}
                             />
                             <NumberCard
                                 value={destiny}
-                                label="Destiny"
-                                sub="Soul purpose"
+                                label={t('destiny')}
+                                sub={t('soulPurpose')}
                                 color="#3498db"
                             />
                         </View>
@@ -100,23 +131,23 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
 
                     {/* YOUR NUMEROLOGY MAP Section */}
                     <View style={styles.section}>
-                        <MysticalText variant="subtitle" style={styles.sectionTitle}>YOUR NUMEROLOGY MAP</MysticalText>
+                        <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('numerologyMap')}</MysticalText>
                         <GlassCard style={styles.mapContainer}>
                             <View style={styles.mapGraphic}>
                                 {/* Central Core */}
                                 <View style={styles.coreNode}>
                                     <View style={[styles.nodeCircle, styles.coreCircle]}>
-                                        <MysticalText style={styles.coreValue}>{lifePath}</MysticalText>
+                                        <MysticalText style={[styles.coreValue, { lineHeight: 40 }]}>{lifePath}</MysticalText>
                                     </View>
-                                    <MysticalText variant="caption" style={styles.nodeLabel}>Core</MysticalText>
+                                    <MysticalText variant="caption" style={styles.nodeLabel}>{t('core')}</MysticalText>
                                 </View>
 
                                 {/* Surrounding Nodes */}
-                                <MapNode label="Life Path" value={lifePath} angle={-90} color="#f1c40f" />
-                                <MapNode label="Destiny" value={destiny} angle={30} color={Colors.secondary} />
-                                <MapNode label="Soul Urge" value={soulUrge} angle={150} color="#3498db" />
-                                <MapNode label="Personality" value={personality} angle={210} color="#e74c3c" />
-                                <MapNode label="Birthday" value={birthday} angle={330} color="#2ecc71" />
+                                <MapNode label={t('lifePath')} value={lifePath} angle={-90} color="#f1c40f" />
+                                <MapNode label={t('destiny')} value={destiny} angle={30} color={Colors.secondary} />
+                                <MapNode label={t('soulUrge')} value={soulUrge} angle={150} color="#3498db" />
+                                <MapNode label={t('personality')} value={personality} angle={210} color="#e74c3c" />
+                                <MapNode label={t('birthday')} value={birthday} angle={330} color="#2ecc71" />
 
                                 {/* Connection Lines */}
                                 <ConnectionLine angle={-90} />
@@ -127,11 +158,11 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                             </View>
 
                             <View style={styles.legend}>
-                                <LegendItem color="#f1c40f" label="Life Path" value={lifePath} />
-                                <LegendItem color={Colors.secondary} label="Destiny" value={destiny} />
-                                <LegendItem color="#3498db" label="Soul Urge" value={soulUrge} />
-                                <LegendItem color="#e74c3c" label="Personality" value={personality} />
-                                <LegendItem color="#2ecc71" label="Birthday" value={birthday} />
+                                <LegendItem color="#f1c40f" label={t('lifePath')} value={lifePath} />
+                                <LegendItem color={Colors.secondary} label={t('destiny')} value={destiny} />
+                                <LegendItem color="#3498db" label={t('soulUrge')} value={soulUrge} />
+                                <LegendItem color="#e74c3c" label={t('personality')} value={personality} />
+                                <LegendItem color="#2ecc71" label={t('birthday')} value={birthday} />
                             </View>
                         </GlassCard>
                     </View>
@@ -139,15 +170,15 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     {/* Ask the Oracle Card */}
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => navigation.navigate('Oracle', { lifePath, language: route.params.language })}
+                        onPress={() => navigation.navigate('Oracle', { lifePath, language })}
                     >
                         <GlassCard style={styles.oracleCTA}>
                             <View style={styles.oracleIconBox}>
                                 <Sparkles color={Colors.primary} size={24} />
                             </View>
                             <View style={styles.oracleTextContent}>
-                                <MysticalText variant="subtitle" style={styles.oracleTitle}>Ask the Oracle</MysticalText>
-                                <MysticalText variant="caption" style={styles.oracleSub}>Get personalized answers to your destiny</MysticalText>
+                                <MysticalText variant="subtitle" style={styles.oracleTitle}>{t('askOracle')}</MysticalText>
+                                <MysticalText variant="caption" style={styles.oracleSub}>{t('oracleSub')}</MysticalText>
                             </View>
                             <ChevronRight color={Colors.textSecondary} size={20} />
                         </GlassCard>
@@ -161,7 +192,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
 
 const NumberCard = ({ value, label, sub, color }: any) => (
     <GlassCard style={styles.numberCard}>
-        <MysticalText style={[styles.numberCardValue, { color }]}>{value}</MysticalText>
+        <MysticalText style={[styles.numberCardValue, { color, lineHeight: 40 }]}>{value}</MysticalText>
         <MysticalText variant="caption" style={styles.numberCardLabel}>{label}</MysticalText>
         <MysticalText style={styles.numberCardSub}>{sub}</MysticalText>
     </GlassCard>
@@ -175,7 +206,7 @@ const MapNode = ({ label, value, angle, color }: any) => {
     return (
         <View style={[styles.node, { transform: [{ translateX: x }, { translateY: y }] }]}>
             <View style={[styles.nodeCircle, { borderColor: color }]}>
-                <MysticalText style={styles.nodeValue}>{value}</MysticalText>
+                <MysticalText style={[styles.nodeValue, { lineHeight: 24 }]}>{value}</MysticalText>
             </View>
             <MysticalText variant="caption" style={styles.nodeLabel}>{label}</MysticalText>
         </View>

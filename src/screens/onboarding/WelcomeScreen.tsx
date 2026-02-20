@@ -4,12 +4,15 @@ import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { Colors } from '../../constants/Colors';
+import { useSettings } from '../../context/SettingsContext';
 
 interface WelcomeScreenProps {
     onStart: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
+    const { t } = useSettings();
+
     return (
         <GradientBackground style={styles.container}>
             <View style={styles.content}>
@@ -33,6 +36,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                 <Button title="Start Your Journey" onPress={onStart} />
                 <MysticalText variant="caption" style={styles.poweredBy}>
                     POWERED BY ADVANCED AI
+                </MysticalText>
+                <MysticalText variant="caption" style={styles.disclaimer}>
+                    {t('disclaimer')}
                 </MysticalText>
             </View>
         </GradientBackground>
@@ -81,4 +87,11 @@ const styles = StyleSheet.create({
         opacity: 0.6,
         letterSpacing: 2,
     },
+    disclaimer: {
+        textAlign: 'center',
+        marginTop: 15,
+        opacity: 0.4,
+        fontSize: 10,
+        paddingHorizontal: 20,
+    }
 });

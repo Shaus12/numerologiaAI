@@ -42,6 +42,8 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
                     Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
 
                     const info = await Purchases.getCustomerInfo();
+                    console.log('RevenueCat Init - CustomerInfo:', JSON.stringify(info, null, 2));
+                    console.log('RevenueCat Init - Active Entitlements:', info.entitlements.active);
                     setCustomerInfo(info);
                 }
             } catch (e) {
@@ -54,6 +56,8 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         init();
 
         const updateListener = (info: CustomerInfo) => {
+            console.log('RevenueCat Update Listener - Info:', JSON.stringify(info, null, 2));
+            console.log('RevenueCat Update Listener - IsPro:', info.entitlements.active[RevenueCatConfig.entitlementId] !== undefined);
             setCustomerInfo(info);
         };
 
@@ -67,6 +71,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     const purchasePackage = async (pack: PurchasesPackage) => {
         try {
             const { customerInfo } = await Purchases.purchasePackage(pack);
+            console.log('Purchase Successful - CustomerInfo:', JSON.stringify(customerInfo, null, 2));
             setCustomerInfo(customerInfo);
         } catch (e: any) {
             if (!e.userCancelled) {

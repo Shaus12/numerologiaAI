@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, TextInput, ScrollView, SafeAreaView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, TextInput, ScrollView, SafeAreaView, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
+import { Button } from '../../components/ui/Button';
 import { Colors } from '../../constants/Colors';
-import { Send, Sparkles } from 'lucide-react-native';
+import { Send, Sparkles, Lock, ArrowLeft, Share, History, X } from 'lucide-react-native';
+import { Share as RNShare } from 'react-native';
+import Purchases, { PurchasesPackage } from 'react-native-purchases';
 import { AIService } from '../../services/ai';
+import { useSettings } from '../../context/SettingsContext';
+import { useRevenueCat } from '../../context/RevenueCatContext';
+import { useUser } from '../../context/UserContext';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '../../navigation/types';
+import { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import { CompositeScreenProps } from '@react-navigation/native';
+import { StackScreenProps } from '@react-navigation/stack';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Oracle'>;
+type Props = CompositeScreenProps<
+    BottomTabScreenProps<MainTabParamList, 'Oracle'>,
+    StackScreenProps<RootStackParamList>
+>;
 
 interface Message {
     id: string;
@@ -17,32 +29,106 @@ interface Message {
     sender: 'user' | 'oracle';
 }
 
-export const OracleScreen: React.FC<Props> = ({ route }) => {
-    const { lifePath, language } = route.params;
+export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
+    const { lifePath } = route.params;
+    const { language, t } = useSettings();
+    const { isPro, purchasePackage } = useRevenueCat();
+    const { userProfile, numerologyResults } = useUser();
+    // Removed useFocusEffect redirect loop
+
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', text: "Greetings, seeker. I am the Oracle. What wisdom do you seek today?", sender: 'oracle' }
+        { id: '1', text: t('oracleGreeting'), sender: 'oracle' }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
+    const [history, setHistory] = useState<{ question: string, answer: string }[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [cooldown, setCooldown] = useState(false);
+
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
+    const loadHistory = async () => {
+        try {
+            const saved = await AsyncStorage.getItem('oracle_history');
+            if (saved) {
+                setHistory(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const saveToHistory = async (question: string, answer: string) => {
+        try {
+            const newEntry = { question, answer };
+            const updated = [newEntry, ...history].slice(0, 5);
+            setHistory(updated);
+            await AsyncStorage.setItem('oracle_history', JSON.stringify(updated));
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleShare = async (text: string) => {
+        try {
+            const message = `Check out my mystical reading from Numerologia AI:\n\n"${text}"\n\nDownload the app to discover your destiny!`;
+            await RNShare.share({
+                message,
+                title: 'Mystical Reading from Numerologia AI'
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const handleSend = async (text: string) => {
-        if (!text.trim() || loading) return;
+        if (!text.trim() || loading || cooldown) return;
 
         const userMsg: Message = { id: Date.now().toString(), text, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setLoading(true);
+        setCooldown(true);
+
+        setTimeout(() => {
+            setCooldown(false);
+        }, 3000);
 
         try {
             const response = await AIService.generateOracleResponse(text, lifePath, language);
             const oracleMsg: Message = { id: (Date.now() + 1).toString(), text: response, sender: 'oracle' };
             setMessages(prev => [...prev, oracleMsg]);
+            saveToHistory(text, response);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
     };
+
+    const handleBack = () => {
+        if (userProfile && numerologyResults) {
+            navigation.navigate('Home', {
+                name: userProfile.name,
+                language: language,
+                reading: numerologyResults.reading || '',
+                lifePath: numerologyResults.lifePath,
+                destiny: numerologyResults.destiny,
+                soulUrge: numerologyResults.soulUrge,
+                personality: numerologyResults.personality,
+                personalYear: numerologyResults.personalYear || 0,
+                dailyNumber: numerologyResults.dailyNumber || 0,
+            });
+        } else {
+            navigation.goBack();
+        }
+    };
+
+    if (!isPro) {
+        return <OraclePaywallOverlay onBack={handleBack} purchasePackage={purchasePackage} />;
+    }
 
     return (
         <GradientBackground>
@@ -52,59 +138,193 @@ export const OracleScreen: React.FC<Props> = ({ route }) => {
                     style={styles.keyboardView}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                 >
-                    <View style={styles.header}>
-                        <Sparkles color={Colors.primary} size={24} />
-                        <MysticalText variant="h2">AI Oracle</MysticalText>
-                    </View>
-
-                    <ScrollView
-                        style={styles.chatArea}
-                        contentContainerStyle={styles.chatContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {messages.map((msg) => (
-                            <View key={msg.id} style={[
-                                styles.messageWrapper,
-                                msg.sender === 'user' ? styles.userWrapper : styles.oracleWrapper
-                            ]}>
-                                <GlassCard style={[
-                                    styles.messageCard,
-                                    msg.sender === 'user' ? styles.userCard : styles.oracleCard
-                                ]}>
-                                    <MysticalText style={styles.messageText}>{msg.text}</MysticalText>
-                                </GlassCard>
-                            </View>
-                        ))}
-                        {loading && (
-                            <View style={styles.oracleWrapper}>
-                                <GlassCard style={styles.oracleCard}>
-                                    <MysticalText style={styles.messageText}>The Oracle is channeling...</MysticalText>
-                                </GlassCard>
-                            </View>
-                        )}
-                    </ScrollView>
-
-                    <View style={styles.inputArea}>
-                        <View style={styles.presets}>
-                            <PresetBtn text="Full analysis" onPress={() => handleSend("Give me a full numerological analysis.")} />
-                            <PresetBtn text="Love life" onPress={() => handleSend("What does my love life look like?")} />
-                            <PresetBtn text="Career path" onPress={() => handleSend("What is my ideal career path?")} />
-                        </View>
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Ask your question..."
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={input}
-                                onChangeText={setInput}
-                                multiline
-                            />
-                            <TouchableOpacity style={styles.sendBtn} onPress={() => handleSend(input)}>
-                                <Send color="#0a0612" size={20} />
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.header}>
+                            <TouchableOpacity onPress={() => setShowHistory(true)} style={styles.historyBtn}>
+                                <History color={Colors.textSecondary} size={24} />
                             </TouchableOpacity>
+                            <View style={styles.headerTitle}>
+                                <Sparkles color={Colors.primary} size={24} />
+                                <MysticalText variant="h2">AI Oracle</MysticalText>
+                            </View>
+                            <View style={{ width: 24 }} />
+                        </View>
+
+                        <ScrollView
+                            style={styles.chatArea}
+                            contentContainerStyle={styles.chatContent}
+                            showsVerticalScrollIndicator={false}
+                            keyboardDismissMode="on-drag"
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {messages.map((msg) => (
+                                <View key={msg.id} style={[
+                                    styles.messageWrapper,
+                                    msg.sender === 'user' ? styles.userWrapper : styles.oracleWrapper
+                                ]}>
+                                    <GlassCard style={[
+                                        styles.messageCard,
+                                        msg.sender === 'user' ? styles.userCard : styles.oracleCard
+                                    ]}>
+                                        <MysticalText style={styles.messageText}>{msg.text}</MysticalText>
+                                        {msg.sender === 'oracle' && (
+                                            <TouchableOpacity
+                                                style={styles.shareBtn}
+                                                onPress={() => handleShare(msg.text)}
+                                            >
+                                                <Share size={14} color={Colors.textSecondary} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </GlassCard>
+                                </View>
+                            ))}
+                            {loading && (
+                                <View style={styles.oracleWrapper}>
+                                    <GlassCard style={styles.oracleCard}>
+                                        <MysticalText style={styles.messageText}>{t('oracleChanneling')}</MysticalText>
+                                    </GlassCard>
+                                </View>
+                            )}
+                        </ScrollView>
+
+                        <View style={styles.inputArea}>
+                            <View style={styles.presets}>
+                                <PresetBtn text={t('presetAnalysis')} onPress={() => handleSend("Give me a full numerological analysis.")} />
+                                <PresetBtn text={t('presetLove')} onPress={() => handleSend("What does my love life look like?")} />
+                                <PresetBtn text={t('presetCareer')} onPress={() => handleSend("What is my ideal career path?")} />
+                            </View>
+                            <View style={styles.inputContainer}>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder={t('inputPlaceholder')}
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={input}
+                                    onChangeText={setInput}
+                                    multiline
+                                    editable={!loading && !cooldown}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.sendBtn, (loading || cooldown) && { opacity: 0.5 }]}
+                                    onPress={() => handleSend(input)}
+                                    disabled={loading || cooldown}
+                                >
+                                    <Send color="#0a0612" size={20} />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 </KeyboardAvoidingView>
+
+                <Modal
+                    visible={showHistory}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowHistory(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <GlassCard style={styles.historyModal}>
+                            <View style={styles.modalHeader}>
+                                <MysticalText variant="subtitle" style={styles.modalTitle}>{t('recentQuestions') || 'Recent Questions'}</MysticalText>
+                                <TouchableOpacity onPress={() => setShowHistory(false)}>
+                                    <X color={Colors.textSecondary} size={24} />
+                                </TouchableOpacity>
+                            </View>
+
+                            {history.length === 0 ? (
+                                <MysticalText style={styles.emptyHistory}>{t('noHistory') || 'The mists of time are clear...'}</MysticalText>
+                            ) : (
+                                <FlatList
+                                    data={history}
+                                    keyExtractor={(_, index) => index.toString()}
+                                    renderItem={({ item }) => (
+                                        <View style={styles.historyItem}>
+                                            <MysticalText variant="caption" style={styles.historyQ}>Q: {item.question}</MysticalText>
+                                            <MysticalText style={styles.historyA}>A: {item.answer}</MysticalText>
+                                        </View>
+                                    )}
+                                    contentContainerStyle={styles.historyList}
+                                />
+                            )}
+                        </GlassCard>
+                    </View>
+                </Modal>
+            </SafeAreaView>
+        </GradientBackground>
+    );
+};
+
+const OraclePaywallOverlay = ({ onBack, purchasePackage }: { onBack: () => void, purchasePackage: (pkg: PurchasesPackage) => Promise<void> }) => {
+    const [pkg, setPkg] = useState<PurchasesPackage | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadOfferings = async () => {
+            try {
+                const offerings = await Purchases.getOfferings();
+                if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+                    setPkg(offerings.current.availablePackages[0]);
+                }
+            } catch (e) {
+                console.error('Error fetching offerings:', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadOfferings();
+    }, []);
+
+    const handlePurchase = async () => {
+        if (!pkg) return;
+        try {
+            await purchasePackage(pkg);
+        } catch (e) {
+            console.log('Purchase cancelled or failed');
+        }
+    };
+
+    return (
+        <GradientBackground>
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.paywallContainer}>
+                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                        <ArrowLeft color={Colors.textSecondary} size={24} />
+                        <MysticalText style={styles.backText}>Back to Home</MysticalText>
+                    </TouchableOpacity>
+
+                    <View style={styles.paywallContent}>
+                        <View style={styles.lockIconContainer}>
+                            <Lock color={Colors.primary} size={50} />
+                        </View>
+
+                        <MysticalText variant="h2" style={styles.paywallTitle}>
+                            Unlock the Oracle
+                        </MysticalText>
+
+                        <MysticalText style={styles.paywallSubtitle}>
+                            Start your 7-day free trial to consult the Oracle and reveal your destiny.
+                        </MysticalText>
+
+                        {loading ? (
+                            <ActivityIndicator color={Colors.primary} />
+                        ) : (
+                            <View style={styles.offerContainer}>
+                                <MysticalText style={styles.priceText}>
+                                    Free for 7 days, then {pkg?.product.priceString}/month
+                                </MysticalText>
+
+                                <Button
+                                    title="Start Your 7-Day Free Trial"
+                                    onPress={handlePurchase}
+                                    style={styles.paywallBtn}
+                                />
+
+                                <MysticalText variant="caption" style={styles.cancelText}>
+                                    Cancel anytime.
+                                </MysticalText>
+                            </View>
+                        )}
+                    </View>
+                </View>
             </SafeAreaView>
         </GradientBackground>
     );
@@ -194,4 +414,122 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    // Paywall Overlay Styles
+    paywallContainer: {
+        flex: 1,
+        padding: 25,
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 40,
+        gap: 10,
+    },
+    backText: {
+        color: Colors.textSecondary,
+        fontSize: 16,
+    },
+    paywallContent: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingBottom: 100,
+    },
+    lockIconContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 30,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.3)',
+    },
+    paywallTitle: {
+        textAlign: 'center',
+        marginBottom: 15,
+        fontSize: 28,
+    },
+    paywallSubtitle: {
+        textAlign: 'center',
+        color: Colors.textSecondary,
+        marginBottom: 40,
+        lineHeight: 24,
+        paddingHorizontal: 10,
+    },
+    offerContainer: {
+        width: '100%',
+        alignItems: 'center',
+    },
+    priceText: {
+        marginBottom: 15,
+        fontSize: 14,
+        color: '#fff',
+        fontWeight: '600',
+    },
+    paywallBtn: {
+        width: '100%',
+        marginBottom: 15,
+    },
+    cancelText: {
+        opacity: 0.6,
+    },
+    shareBtn: {
+        alignSelf: 'flex-end',
+        padding: 5,
+        marginTop: 5,
+    },
+    // History Modal
+    historyBtn: {
+        padding: 5,
+    },
+    headerTitle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    historyModal: {
+        maxHeight: '70%',
+        padding: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        color: Colors.primary,
+    },
+    historyList: {
+        gap: 15,
+    },
+    historyItem: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 10,
+    },
+    historyQ: {
+        color: Colors.textSecondary,
+        marginBottom: 5,
+        fontStyle: 'italic',
+    },
+    historyA: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    emptyHistory: {
+        textAlign: 'center',
+        opacity: 0.6,
+        padding: 20,
+    }
 });

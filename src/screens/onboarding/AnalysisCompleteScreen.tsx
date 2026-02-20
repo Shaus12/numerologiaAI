@@ -5,14 +5,38 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { ChevronRight, Lock } from 'lucide-react-native';
+import { ChevronRight, Lock, Share } from 'lucide-react-native';
+import { Share as RNShare } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
+import { NotificationService } from '../../services/notificationService';
+
 export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) => {
     const { lifePath } = route.params;
+
+    const handleShare = async () => {
+        try {
+            await RNShare.share({
+                message: `I discovered my Life Path Number is ${lifePath} - The Powerhouse! ✨\n\nUnlock your own detailed numerology report with Numerologia AI.`,
+                title: 'My Numerology Analysis'
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    React.useEffect(() => {
+        const setupNotifications = async () => {
+            const granted = await NotificationService.requestPermissions();
+            if (granted) {
+                await NotificationService.scheduleDailyReminder();
+            }
+        };
+        setupNotifications();
+    }, []);
 
     return (
         <GradientBackground style={styles.container}>
@@ -33,6 +57,11 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                         <MysticalText variant="body" style={styles.heroDescription}>
                             You are destined for material success and authority. Your path involves manifesting abundance and wielding power wisely.
                         </MysticalText>
+
+                        <TouchableOpacity style={styles.shareAnalysisBtn} onPress={handleShare}>
+                            <Share size={16} color={Colors.secondary} style={{ marginRight: 8 }} />
+                            <MysticalText variant="caption" style={styles.shareText}>SHARE MY PATH</MysticalText>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.lockedSection}>
@@ -54,8 +83,12 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
 
                     <View style={styles.footer}>
                         <Button
-                            title="Unlock Your Full Report"
-                            onPress={() => navigation.navigate('MainTabs', route.params)}
+                            title="Claim Your 7-Day Free Access"
+                            onPress={() => {
+                                // Navigate to Tabs first (so they are active in bg) then Paywall modal on top
+                                navigation.navigate('MainTabs', route.params);
+                                setTimeout(() => navigation.navigate('Paywall'), 100);
+                            }}
                         />
                         <MysticalText variant="caption" style={styles.footerNote}>
                             25+ pages of personalized insights
@@ -146,6 +179,22 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 22,
         opacity: 0.8,
+        marginBottom: 20,
+    },
+    shareAnalysisBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    shareText: {
+        color: Colors.secondary,
+        fontWeight: '700',
+        letterSpacing: 1,
     },
     lockedSection: {
         paddingHorizontal: 25,

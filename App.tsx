@@ -21,10 +21,13 @@ import { HomeScreen } from './src/screens/main/HomeScreen';
 import { OracleScreen } from './src/screens/main/OracleScreen';
 import { MatchScreen } from './src/screens/main/MatchScreen';
 import { ProfileScreen } from './src/screens/main/ProfileScreen';
+import { PaywallScreen } from './src/screens/main/PaywallScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
 import { Home, Sparkles, Heart, User } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { SettingsProvider } from './src/context/SettingsContext';
+import { SettingsScreen } from './src/screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -76,7 +79,7 @@ function MainTabNavigator({ route }: any) {
   );
 }
 
-const AppContent = () => {
+const AppContent = (props: { navigationRef: any }) => {
   const [userData, setUserData] = useState<any>({});
   const { userProfile, numerologyResults, isLoading } = useUser();
   const [splashFinished, setSplashFinished] = useState(false);
@@ -97,7 +100,7 @@ const AppContent = () => {
   } : undefined;
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={props.navigationRef}>
       <StatusBar style="light" />
       <Stack.Navigator
         screenOptions={{
@@ -114,7 +117,7 @@ const AppContent = () => {
           {(props) => (
             // If we are here, it means we don't have data (or explicit nav). 
             // We can just immediately replace since we already showed the splash.
-            // But wait, if initialRouteName is Splash, it will mount this.
+            // But wait, if initialRouteName="Splash", it will mount this.
             // And this Splash calls onFinish which replaces with Welcome.
             // Since we already showed a "loading splash", we might want to skip this one 
             // and go straight to Welcome? 
@@ -250,6 +253,9 @@ const AppContent = () => {
 
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
 
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
+
         <Stack.Screen
           name="MainTabs"
           component={MainTabNavigator}
@@ -262,11 +268,40 @@ const AppContent = () => {
 };
 
 
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 export default function App() {
+  const navigationRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    // Handle notification click
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      // Navigate to Home tab when notification is tapped
+      if (navigationRef.current) {
+        navigationRef.current.navigate('MainTabs', {
+          screen: 'Home',
+          params: { openDailyInsight: true }
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   return (
     <RevenueCatProvider>
       <UserProvider>
-        <AppContent />
+        <SettingsProvider>
+          <AppContent navigationRef={navigationRef} />
+        </SettingsProvider>
       </UserProvider>
     </RevenueCatProvider>
   );

@@ -1,8 +1,40 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Alert } from 'react-native';
 import { NumerologyEngine } from '../utils/numerology';
 
-const API_KEY = 'AIzaSyAvxUKMG_0NRu2u1ypBlWcGBApwqm7OD_c';
-const genAI = new GoogleGenerativeAI(API_KEY);
+// TODO: Replace with your actual Supabase Project Reference
+const SUPABASE_PROJECT_REF = 'cwnnjhcivkqnqgpmnitj';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3bm5qaGNpdmtxbnFncG1uaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NzYxOTgsImV4cCI6MjA4NjA1MjE5OH0.h6uIZ75nrJGH7PopjA8uuhbKBRacj_5Jmk1ZP0Y46xg';
+const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_REF}.functions.supabase.co/gemini-proxy`;
+
+const handleError = (error: any) => {
+    console.error('AI Service Error:', error);
+    Alert.alert(
+        "Cosmic Connection Weak",
+        "The stars are misaligned. Please check your internet and try again."
+    );
+    throw error;
+};
+
+const callProxy = async (prompt: string) => {
+    try {
+        const response = await fetch(EDGE_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'X-App-Secret': 'YOUR_INTERNAL_SECRET_KEY',
+            },
+            body: JSON.stringify({ prompt }),
+        });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const dataResponse = await response.json();
+        return dataResponse.text;
+    } catch (error) {
+        throw error;
+    }
+};
 
 export const AIService = {
     /**
@@ -18,7 +50,6 @@ export const AIService = {
         language?: string;
     }) => {
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const lang = data.language || 'English';
 
             const prompt = `
@@ -33,14 +64,14 @@ export const AIService = {
         Provide a short (2-3 paragraphs) mystical, inspiring reading that explains the core essence of this person according to these numbers.
         Keep the tone elegant, high-end, and profound.
         RESPONSE LANGUAGE: ${lang}
+        
+         IMPORTANT: If the response language is Hebrew, ensure all sentences end with proper punctuation characters that render correctly in RTL (e.g. putting question marks at the visual end of the sentence).
       `;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+            return await callProxy(prompt);
         } catch (error) {
-            console.error('Error generating reading:', error);
-            return "The cosmic energies are currently shifting. Please try again in a moment.";
+            handleError(error);
+            return "The cosmic energies are currently shifting. Please try again in a moment."; // Fallback
         }
     },
 
@@ -49,7 +80,6 @@ export const AIService = {
      */
     generateOracleResponse: async (question: string, lifePath: number | string, language: string = 'English') => {
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const prompt = `
                 You are the AI Oracle of Numerologia. 
                 A seeker with Life Path ${lifePath} asks: "${question}"
@@ -57,11 +87,12 @@ export const AIService = {
                 Provide a mystical, deep, and insightful answer based on numerological wisdom.
                 Keep it concise (1-2 paragraphs).
                 RESPONSE LANGUAGE: ${language}
+                IMPORTANT: If the response language is Hebrew, ensure all punctuation is compatible with RTL rendering.
             `;
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+
+            return await callProxy(prompt);
         } catch (error) {
+            handleError(error);
             return "The Oracle is silent. Seek again later.";
         }
     },
@@ -71,7 +102,6 @@ export const AIService = {
      */
     calculateCompatibility: async (userLifePath: number | string, partnerBirthdate: string, language: string = 'English') => {
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const partnerLP = NumerologyEngine.calculateLifePath(partnerBirthdate);
 
             const prompt = `
@@ -82,10 +112,10 @@ export const AIService = {
                 Provide a short, elegant analysis of their vibrational match and potential challenges.
                 RESPONSE LANGUAGE: ${language}
             `;
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+
+            return await callProxy(prompt);
         } catch (error) {
+            handleError(error);
             return "The stars are unclear about this match.";
         }
     },
@@ -95,12 +125,11 @@ export const AIService = {
      */
     getDailyInsight: async (lifePath: number | string, language: string = 'English') => {
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const prompt = `Provide a single, powerful oracle insight for someone with Life Path ${lifePath} for today. One sentence max. RESPONSE LANGUAGE: ${language}`;
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+
+            return await callProxy(prompt);
         } catch (error) {
+            handleError(error);
             return "Trust your intuition today.";
         }
     }
