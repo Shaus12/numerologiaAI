@@ -14,6 +14,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { NotificationService } from '../../services/notificationService';
+import { touchDebug } from '../../utils/touchDebug';
 import Purchases from 'react-native-purchases';
 import { useUser } from '../../context/UserContext';
 
@@ -95,6 +96,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     text: t('delete') || 'Delete',
                     style: 'destructive',
                     onPress: async () => {
+                        touchDebug("ProfileDeleteAccountConfirmed");
                         await clearUserData();
                     }
                 }
@@ -108,6 +110,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 <ScrollView
                     contentContainerStyle={styles.scroll}
                     keyboardShouldPersistTaps="handled"
+                    delaysContentTouches={false}
                 >
                     <View style={styles.header}>
                         <TouchableOpacity
@@ -135,7 +138,10 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <MysticalText style={styles.premiumText}>{t('premiumMember')}</MysticalText>
                             </TouchableOpacity>
                         ) : (
-                            <TouchableOpacity style={styles.upgradeButton} onPress={presentPaywall}>
+                            <TouchableOpacity style={styles.upgradeButton} onPress={() => {
+                                touchDebug("ProfileUpgradePressed");
+                                presentPaywall();
+                            }}>
                                 <Star color="#FFF" size={16} strokeWidth={2.5} />
                                 <MysticalText style={styles.upgradeText}>{t('upgradePro')}</MysticalText>
                             </TouchableOpacity>

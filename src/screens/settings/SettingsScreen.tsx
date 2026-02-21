@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -28,6 +28,7 @@ export const SettingsScreen = () => {
                 <ScrollView
                     contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps="handled"
+                    delaysContentTouches={false}
                 >
                     <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('languageTitle')}</MysticalText>
 

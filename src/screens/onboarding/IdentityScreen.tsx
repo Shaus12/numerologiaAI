@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
@@ -38,6 +38,7 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
                 showsVerticalScrollIndicator={false}
                 style={styles.scroll}
                 keyboardShouldPersistTaps="handled"
+                delaysContentTouches={false}
             >
                 <View style={styles.header}>
                     <MysticalText variant="h1" style={styles.title}>

@@ -10,6 +10,7 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../../navigation/types';
 import { Sparkles, ChevronRight } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
+import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useUser } from '../../context/UserContext';
 
@@ -88,6 +89,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    delaysContentTouches={false}
                 >
 
                     {/* Header Section */}
@@ -174,7 +176,10 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     {/* Ask the Oracle Card */}
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => navigation.navigate('Oracle', { lifePath, language })}
+                        onPress={() => {
+                            touchDebug("HomeOracleCTAPressed");
+                            navigation.navigate('Oracle', { lifePath, language });
+                        }}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                         <GlassCard style={styles.oracleCTA}>

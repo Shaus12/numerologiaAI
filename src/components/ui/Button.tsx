@@ -1,16 +1,16 @@
 import React from 'react';
 import {
-    TouchableOpacity,
+    Pressable,
     Text,
     StyleSheet,
-    TouchableOpacityProps,
+    PressableProps,
     View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/Colors';
 import { Typography } from '../../constants/Typography';
 
-interface ButtonProps extends TouchableOpacityProps {
+interface ButtonProps extends PressableProps {
     title: string;
     variant?: 'primary' | 'secondary' | 'outline';
 }
@@ -23,26 +23,34 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
     if (variant === 'primary') {
         return (
-            <TouchableOpacity activeOpacity={0.8} style={[styles.container, style]} {...props}>
+            <Pressable
+                style={({ pressed }) => [
+                    styles.container,
+                    style as any,
+                    pressed && { opacity: 0.8 }
+                ]}
+                {...props}
+            >
                 <LinearGradient
                     colors={Colors.goldGradient as any}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.gradient}
+                    pointerEvents="none"
                 >
                     <Text style={styles.primaryText}>{title}</Text>
                 </LinearGradient>
-            </TouchableOpacity>
+            </Pressable>
         );
     }
 
     return (
-        <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
+        <Pressable
+            style={({ pressed }) => [
                 styles.container,
                 variant === 'secondary' ? styles.secondary : styles.outline,
-                style,
+                style as any,
+                pressed && { opacity: 0.7 }
             ]}
             {...props}
         >
@@ -54,7 +62,7 @@ export const Button: React.FC<ButtonProps> = ({
             >
                 {title}
             </Text>
-        </TouchableOpacity>
+        </Pressable>
     );
 };
 

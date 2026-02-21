@@ -11,6 +11,7 @@ import { Send, Sparkles, Lock, ArrowLeft, Share, History, X } from 'lucide-react
 import { Share as RNShare } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 import { AIService } from '../../services/ai';
+import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useUser } from '../../context/UserContext';
@@ -86,7 +87,14 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     };
 
     const handleSend = async (text: string) => {
-        if (!text.trim() || loading || cooldown) return;
+        const isInputEmpty = !text.trim();
+
+        if (isInputEmpty || loading || cooldown) {
+            touchDebug("OracleSendBlocked", { loading, cooldown, isInputEmpty });
+            return;
+        }
+
+        touchDebug("OracleSendPressed", { textLength: text.length });
 
         const userMsg: Message = { id: Date.now().toString(), text, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
@@ -94,9 +102,10 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
         setLoading(true);
         setCooldown(true);
 
+        // Safer anti-double-submit: 500ms cooldown
         setTimeout(() => {
             setCooldown(false);
-        }, 3000);
+        }, 500);
 
         try {
             const response = await AIService.generateOracleResponse(text, lifePath, language);
@@ -104,6 +113,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
             setMessages(prev => [...prev, oracleMsg]);
             saveToHistory(text, response);
         } catch (error) {
+            touchDebug("OracleSendError", error);
             console.error(error);
         } finally {
             setLoading(false);
@@ -158,6 +168,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                             showsVerticalScrollIndicator={false}
                             keyboardDismissMode="on-drag"
                             keyboardShouldPersistTaps="handled"
+                            delaysContentTouches={false}
                         >
                             {messages.map((msg) => (
                                 <View key={msg.id} style={[
@@ -195,22 +206,30 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <PresetBtn text={t('presetLove')} onPress={() => handleSend("What does my love life look like?")} />
                                 <PresetBtn text={t('presetCareer')} onPress={() => handleSend("What is my ideal career path?")} />
                             </View>
+
                             <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder={t('inputPlaceholder')}
-                                    placeholderTextColor="rgba(255,255,255,0.4)"
-                                    value={input}
-                                    onChangeText={setInput}
-                                    multiline
-                                    editable={!loading && !cooldown}
-                                />
+                                <View style={styles.inputWrapper}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder={t('inputPlaceholder')}
+                                        placeholderTextColor="rgba(255,255,255,0.4)"
+                                        value={input}
+                                        onChangeText={setInput}
+                                        multiline
+                                        editable={!loading}
+                                    />
+                                    {(loading || cooldown || !input.trim()) && (
+                                        <MysticalText variant="caption" style={styles.statusInfo}>
+                                            {loading ? "Thinking..." : cooldown ? "One moment..." : "Type a message..."}
+                                        </MysticalText>
+                                    )}
+                                </View>
                                 <TouchableOpacity
-                                    style={[styles.sendBtn, (loading || cooldown) && { opacity: 0.5 }]}
+                                    style={[styles.sendBtn, (loading || cooldown || !input.trim()) && styles.sendBtnDisabled]}
                                     onPress={() => handleSend(input)}
-                                    disabled={loading || cooldown}
+                                    disabled={loading || cooldown || !input.trim()}
                                 >
-                                    <Send color="#0a0612" size={20} />
+                                    <Send color={loading || cooldown || !input.trim() ? "rgba(10, 6, 18, 0.3)" : "#0a0612"} size={20} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -381,6 +400,19 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    sendBtnDisabled: {
+        backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    },
+    inputWrapper: {
+        flex: 1,
+        gap: 4,
+    },
+    statusInfo: {
+        fontSize: 10,
+        color: Colors.textSecondary,
+        paddingLeft: 20,
+        fontStyle: 'italic',
     },
     // Paywall Overlay Styles
     paywallContainer: {

@@ -48,6 +48,7 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
             <ScrollView
                 style={styles.listContainer}
                 keyboardShouldPersistTaps="handled"
+                delaysContentTouches={false}
             >
                 {LANGUAGES.map((item) => (
                     <TouchableOpacity

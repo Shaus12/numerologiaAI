@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, ViewProps } from 'react-native';
+import { StyleSheet, View, ViewProps } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/Colors';
 
@@ -9,13 +9,14 @@ interface GradientBackgroundProps extends ViewProps {
 
 export const GradientBackground: React.FC<GradientBackgroundProps> = ({ children, style, ...props }) => {
     return (
-        <LinearGradient
-            colors={Colors.gradient as any}
-            style={[styles.container, style]}
-            {...props}
-        >
+        <View style={[styles.container, style]} {...props}>
+            <LinearGradient
+                colors={Colors.gradient as any}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+            />
             {children}
-        </LinearGradient>
+        </View>
     );
 };
 

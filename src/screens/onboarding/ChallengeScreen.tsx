@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
@@ -27,7 +27,7 @@ export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) 
         <GradientBackground style={styles.container}>
             <OnboardingHeader step={7} totalSteps={10} />
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" delaysContentTouches={false}>
                 <MysticalText variant="h1" style={styles.title}>
                     What is your {'\n'}
                     <MysticalText variant="h1" color={Colors.primary}>biggest challenge?</MysticalText>

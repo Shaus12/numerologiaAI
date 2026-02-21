@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
@@ -32,6 +32,7 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                delaysContentTouches={false}
             >
                 <MysticalText variant="h1" style={styles.title}>
                     What is your {'\n'}

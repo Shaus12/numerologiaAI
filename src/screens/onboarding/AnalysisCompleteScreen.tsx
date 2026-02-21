@@ -52,6 +52,7 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    delaysContentTouches={false}
                 >
                     <View style={styles.successIcon}>
                         <CheckCircle2 color={Colors.primary} size={64} />

@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { InteractionManager, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Purchases, { CustomerInfo, PurchasesPackage, LOG_LEVEL } from 'react-native-purchases';
-import RevenueCatUI from 'react-native-purchases-ui';
 import { RevenueCatConfig } from '../constants/RevenueCat';
-import { Platform } from 'react-native';
+
+const IS_PRO_CACHE_KEY = 'rc_is_pro_cached';
 
 interface RevenueCatContextType {
-    customerInfo: CustomerInfo | null;
     isPro: boolean;
     isLoading: boolean;
     purchasePackage: (pack: PurchasesPackage) => Promise<void>;
@@ -24,187 +25,170 @@ export const useRevenueCat = () => {
     return context;
 };
 
-interface RevenueCatProviderProps {
-    children: ReactNode;
+function computeIsPro(info: CustomerInfo | null): boolean {
+    if (!info?.entitlements) return false;
+
+    const activeEntitlements = info.entitlements.active || {};
+    const activeIds = Object.keys(activeEntitlements);
+
+    let hasEntitlement = activeEntitlements[RevenueCatConfig.entitlementId] !== undefined;
+
+    if (!hasEntitlement && RevenueCatConfig.alternativeIds) {
+        hasEntitlement = RevenueCatConfig.alternativeIds.some(id => activeEntitlements[id] !== undefined);
+    }
+
+    const hasAnyActiveSub = (info.activeSubscriptions || []).length > 0;
+
+    return hasEntitlement || activeIds.length > 0 || hasAnyActiveSub;
 }
 
-export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children }) => {
-    const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+async function ensureConfigured(): Promise<boolean> {
+    try {
+        if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
+        const isConfigured = await Purchases.isConfigured();
+        if (!isConfigured) {
+            Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+        }
+        return true;
+    } catch (e) {
+        console.error('RevenueCat configure error:', e);
+        return false;
+    }
+}
+
+export const RevenueCatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [isPro, setIsPro] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const configuredRef = useRef(false);
 
-    const prevEntitlementKeysRef = useRef<string>('');
-
-    const isPro = useMemo(() => {
-        if (!customerInfo || !customerInfo.entitlements) {
-            return false;
-        }
-
-        const activeEntitlements = customerInfo.entitlements.active || {};
-        const activeIds = Object.keys(activeEntitlements);
-
-        // 1. Check primary ID
-        let hasEntitlement = activeEntitlements[RevenueCatConfig.entitlementId] !== undefined;
-
-        // 2. Check alternative IDs
-        if (!hasEntitlement && RevenueCatConfig.alternativeIds) {
-            hasEntitlement = RevenueCatConfig.alternativeIds.some(id => activeEntitlements[id] !== undefined);
-        }
-
-        // 3. Fallback: If they have ANY active subscription but entitlement mapping is broken,
-        // we might want to allow access anyway during debugging/soft launch.
-        const hasAnyActiveSub = (customerInfo.activeSubscriptions || []).length > 0;
-
-        return hasEntitlement || activeIds.length > 0 || hasAnyActiveSub;
-    }, [customerInfo]);
-
-    const smartSetCustomerInfo = useCallback((info: CustomerInfo) => {
-        try {
-            if (!info || !info.entitlements) return;
-
-            // Deep-ish check: check active entitlement keys and expiration dates if available
-            // This prevents the re-render loop when RevenueCat spams progress updates
-            const newKeys = Object.keys(info.entitlements.active || {}).sort().join(',');
-            const expirationDates = Object.values(info.entitlements.active || {})
-                .map(e => e.expirationDate)
-                .sort()
-                .join(',');
-
-            const stateString = `${newKeys}|${expirationDates}`;
-
-            setCustomerInfo(prev => {
-                const prevKeys = Object.keys(prev?.entitlements?.active || {}).sort().join(',');
-                const prevExp = Object.values(prev?.entitlements?.active || {})
-                    .map(e => e.expirationDate)
-                    .sort()
-                    .join(',');
-                const prevStateString = `${prevKeys}|${prevExp}`;
-
-                if (stateString !== prevStateString || !prev) {
-                    prevEntitlementKeysRef.current = newKeys;
-                    return info;
-                }
-                return prev;
-            });
-        } catch (e) {
-            console.error('Error in smartSetCustomerInfo:', e);
-        }
+    const updateIsPro = useCallback((newPro: boolean) => {
+        setIsPro(prev => {
+            if (prev === newPro) return prev;
+            AsyncStorage.setItem(IS_PRO_CACHE_KEY, JSON.stringify(newPro)).catch(() => {});
+            return newPro;
+        });
     }, []);
 
     useEffect(() => {
-        const init = async () => {
-            try {
-                if (Platform.OS === 'android' || Platform.OS === 'ios') {
-                    Purchases.setLogLevel(LOG_LEVEL.WARN);
-                    const isConfigured = await Purchases.isConfigured();
-                    if (!isConfigured) {
-                        try {
-                            Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
-                        } catch (confError) {
-                            console.error('RevenueCat configure error:', confError);
-                        }
-                    }
-
-                    const info = await Purchases.getCustomerInfo();
-                    if (info) {
-                        console.log('[RevenueCat] Initial CustomerInfo loaded, active:', Object.keys(info.entitlements.active || {}).join(',') || 'none');
-                        prevEntitlementKeysRef.current = Object.keys(info.entitlements.active || {}).sort().join(',');
-                        setCustomerInfo(info);
-                    }
-                }
-            } catch (e) {
-                console.error('RevenueCat init error:', e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        const timer = setTimeout(init, 500); // Slight delay to ensure bridge is ready
+        let cancelled = false;
+        let listenerAdded = false;
 
         const updateListener = (info: CustomerInfo) => {
-            smartSetCustomerInfo(info);
+            if (!cancelled) updateIsPro(computeIsPro(info));
         };
 
-        try {
-            Purchases.addCustomerInfoUpdateListener(updateListener);
-        } catch (le) {
-            console.error('Failed to add RevenueCat listener:', le);
-        }
+        const loadCachedState = async () => {
+            try {
+                const cached = await AsyncStorage.getItem(IS_PRO_CACHE_KEY);
+                if (cached !== null && !cancelled) {
+                    updateIsPro(JSON.parse(cached));
+                }
+            } catch (_) {}
+            if (!cancelled) setIsLoading(false);
+        };
+
+        const initRC = async () => {
+            try {
+                Purchases.setLogLevel(LOG_LEVEL.ERROR);
+                const ok = await ensureConfigured();
+                if (!ok || cancelled) return;
+                configuredRef.current = true;
+
+                const info = await Purchases.getCustomerInfo();
+                if (info && !cancelled) {
+                    updateIsPro(computeIsPro(info));
+                }
+
+                try {
+                    Purchases.addCustomerInfoUpdateListener(updateListener);
+                    listenerAdded = true;
+                } catch (_) {}
+            } catch (e) {
+                console.error('RevenueCat init error:', e);
+            }
+        };
+
+        loadCachedState();
+
+        const handle = InteractionManager.runAfterInteractions(() => {
+            setTimeout(() => {
+                if (!cancelled) initRC();
+            }, 5000);
+        });
 
         return () => {
-            clearTimeout(timer);
-            try {
-                Purchases.removeCustomerInfoUpdateListener(updateListener);
-            } catch (le) {
-                console.error('Failed to remove RevenueCat listener:', le);
+            cancelled = true;
+            handle.cancel();
+            if (listenerAdded) {
+                try { Purchases.removeCustomerInfoUpdateListener(updateListener); } catch (_) {}
             }
         };
-    }, [smartSetCustomerInfo]);
+    }, [updateIsPro]);
 
     const purchasePackage = useCallback(async (pack: PurchasesPackage) => {
+        if (!configuredRef.current) await ensureConfigured();
         try {
             const { customerInfo: info } = await Purchases.purchasePackage(pack);
-            if (info && info.entitlements && info.entitlements.active) {
-                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
-                setCustomerInfo(info);
-            }
+            if (info) updateIsPro(computeIsPro(info));
         } catch (e: any) {
             console.error('Purchase error:', e);
             throw e;
         }
-    }, []);
+    }, [updateIsPro]);
 
     const restorePurchases = useCallback(async () => {
+        if (!configuredRef.current) await ensureConfigured();
         try {
             const info = await Purchases.restorePurchases();
-            if (info && info.entitlements && info.entitlements.active) {
-                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
-                setCustomerInfo(info);
-            }
+            if (info) updateIsPro(computeIsPro(info));
             return info;
         } catch (e) {
             console.error('Restore error:', e);
             return null;
         }
-    }, []);
+    }, [updateIsPro]);
 
     const presentPaywall = useCallback(async (): Promise<boolean> => {
+        if (!configuredRef.current) await ensureConfigured();
         try {
-            await RevenueCatUI.presentPaywall();
+            const RCUI = require('react-native-purchases-ui').default;
+            await RCUI.presentPaywall();
         } catch (e) {
             console.error('Paywall presentation error:', e);
         }
 
         try {
             const info = await Purchases.getCustomerInfo();
-            if (info && info.entitlements && info.entitlements.active) {
-                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
-                setCustomerInfo(info);
-                return Object.keys(info.entitlements.active).length > 0;
+            if (info) {
+                const pro = computeIsPro(info);
+                updateIsPro(pro);
+                return pro;
             }
             return false;
         } catch (e) {
             console.error('Error refreshing customer info after paywall:', e);
             return false;
         }
-    }, []);
+    }, [updateIsPro]);
 
     const presentCustomerCenter = useCallback(async () => {
+        if (!configuredRef.current) await ensureConfigured();
         try {
-            await RevenueCatUI.presentCustomerCenter();
+            const RCUI = require('react-native-purchases-ui').default;
+            await RCUI.presentCustomerCenter();
         } catch (e) {
-            console.error('Customer Center not supported or error:', e);
+            console.error('Customer Center error:', e);
         }
     }, []);
 
     const contextValue = useMemo(() => ({
-        customerInfo,
         isPro,
         isLoading,
         purchasePackage,
         restorePurchases,
         presentPaywall,
         presentCustomerCenter,
-    }), [customerInfo, isPro, isLoading, purchasePackage, restorePurchases, presentPaywall, presentCustomerCenter]);
+    }), [isPro, isLoading, purchasePackage, restorePurchases, presentPaywall, presentCustomerCenter]);
 
     return (
         <RevenueCatContext.Provider value={contextValue}>

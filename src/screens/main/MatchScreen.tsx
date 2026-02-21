@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, Platform, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Platform, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Heart, Sparkles, ArrowLeft, Lock } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
+import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -67,6 +68,7 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     const handleStartScan = async () => {
+        touchDebug("MatchStartScanPressed");
         setStep('scanning');
         scanRotation.value = 0;
         scanRotation.value = withRepeat(
@@ -145,6 +147,7 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
                     <ScrollView
                         contentContainerStyle={styles.scroll}
                         keyboardShouldPersistTaps="handled"
+                        delaysContentTouches={false}
                     >
                         <View style={styles.header}>
                             <Sparkles color={Colors.primary} size={32} />

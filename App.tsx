@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { RevenueCatProvider } from './src/context/RevenueCatContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -49,15 +49,16 @@ function MainTabNavigator({ route }: any) {
           borderTopColor: 'rgba(255,255,255,0.05)',
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom,
-          zIndex: 100,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarIcon: ({ color, size }) => {
-          if (route.name === 'Home') return <Home color={color} size={size} />;
-          if (route.name === 'Oracle') return <Sparkles color={color} size={size} />;
-          if (route.name === 'Match') return <Heart color={color} size={size} />;
-          if (route.name === 'Profile') return <User color={color} size={size} />;
+          let icon;
+          if (route.name === 'Home') icon = <Home color={color} size={size} />;
+          else if (route.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
+          else if (route.name === 'Match') icon = <Heart color={color} size={size} />;
+          else icon = <User color={color} size={size} />;
+          return <View pointerEvents="none">{icon}</View>;
         },
       })}
     >
