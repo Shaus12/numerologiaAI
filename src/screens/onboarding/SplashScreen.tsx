@@ -49,7 +49,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                 </MysticalText>
             </View>
 
-            <View style={styles.footer}>
+            <View style={styles.footer} pointerEvents="none">
                 <View style={styles.progressBarBg}>
                     <Animated.View style={[styles.progressBarFilled, { width: progressWidth }]} />
                 </View>

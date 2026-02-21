@@ -34,7 +34,12 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
         <GradientBackground style={styles.container}>
             <OnboardingHeader step={8} totalSteps={10} />
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 <MysticalText variant="h1" style={styles.title}>
                     What do you expect {'\n'}
                     from <MysticalText variant="h1" color={Colors.primary}>Numerologia AI?</MysticalText>

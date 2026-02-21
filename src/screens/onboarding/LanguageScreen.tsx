@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
@@ -45,7 +45,10 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
                 </MysticalText>
             </View>
 
-            <View style={styles.listContainer}>
+            <ScrollView
+                style={styles.listContainer}
+                keyboardShouldPersistTaps="handled"
+            >
                 {LANGUAGES.map((item) => (
                     <TouchableOpacity
                         key={item.id}
@@ -67,7 +70,7 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
                         </GlassCard>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </ScrollView>
 
             <View style={styles.footer}>
                 <Button title="Continue" onPress={() => onContinue(selected)} />

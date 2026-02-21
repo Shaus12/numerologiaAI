@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { RevenueCatProvider } from './src/context/RevenueCatContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -29,7 +30,7 @@ import { UserProvider, useUser } from './src/context/UserContext';
 import { useRevenueCat } from './src/context/RevenueCatContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { SettingsScreen } from './src/screens/settings/SettingsScreen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,6 +38,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabNavigator({ route }: any) {
   const results = route.params || {};
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -45,8 +47,9 @@ function MainTabNavigator({ route }: any) {
         tabBarStyle: {
           backgroundColor: '#0a0612',
           borderTopColor: 'rgba(255,255,255,0.05)',
-          paddingBottom: 5,
-          paddingTop: 5,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+          zIndex: 100,
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
@@ -82,26 +85,141 @@ function MainTabNavigator({ route }: any) {
   );
 }
 
+const MainTabs = (props: any) => <MainTabNavigator {...props} />;
+const CalculatingScreenWrapper = ({ route, navigation }: any) => {
+  const { userData } = route.params;
+  return (
+    <CalculatingScreen
+      userData={userData}
+      onFinish={(results: any) => {
+        navigation.replace('AnalysisComplete', results);
+      }}
+    />
+  );
+};
+
 const AppContent = (props: { navigationRef: any }) => {
   const [userData, setUserData] = useState<any>({});
+  const userDataRef = useRef(userData);
+  userDataRef.current = userData;
+
   const { userProfile, numerologyResults, isLoading: isUserLoading } = useUser();
   const { isLoading: isRcLoading } = useRevenueCat();
   const [splashFinished, setSplashFinished] = useState(false);
 
-  if (isUserLoading || isRcLoading || !splashFinished) {
+  // Buffer heavy context changes to avoid UI lockup during startup
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    InteractionManager.runAfterInteractions(() => {
+      setReady(true);
+    });
+  }, []);
+
+  // Memoize stable component references to prevent unmounting on AppContent re-renders
+  const WelcomeComponent = useMemo(() => (props: any) => (
+    <WelcomeScreen onStart={() => props.navigation.navigate('Language')} />
+  ), []);
+
+  const LanguageComponent = useMemo(() => (props: any) => (
+    <LanguageScreen
+      onContinue={(lang: any) => {
+        setUserData((prev: any) => ({ ...prev, language: lang }));
+        props.navigation.navigate('Identity');
+      }}
+    />
+  ), []);
+
+  const IdentityComponent = useMemo(() => (props: any) => (
+    <IdentityScreen
+      onBack={() => props.navigation.goBack()}
+      onContinue={(identity: any) => {
+        setUserData((prev: any) => ({ ...prev, identity }));
+        props.navigation.navigate('Name');
+      }}
+    />
+  ), []);
+
+  const NameComponent = useMemo(() => (props: any) => (
+    <NameScreen
+      onBack={() => props.navigation.goBack()}
+      onContinue={(name: any) => {
+        setUserData((prev: any) => ({ ...prev, name }));
+        props.navigation.navigate('BirthTime');
+      }}
+    />
+  ), []);
+
+  const BirthTimeComponent = useMemo(() => (props: any) => (
+    <BirthTimeScreen
+      onContinue={(knowsTime: any) => {
+        setUserData((prev: any) => ({ ...prev, knowsBirthTime: knowsTime }));
+        props.navigation.navigate('Relationship');
+      }}
+    />
+  ), []);
+
+  const RelationshipComponent = useMemo(() => (props: any) => (
+    <RelationshipScreen
+      onContinue={(status: any) => {
+        setUserData((prev: any) => ({ ...prev, relationshipStatus: status }));
+        props.navigation.navigate('Focus');
+      }}
+    />
+  ), []);
+
+  const FocusComponent = useMemo(() => (props: any) => (
+    <FocusScreen
+      onContinue={(focus: any) => {
+        setUserData((prev: any) => ({ ...prev, focus }));
+        props.navigation.navigate('Challenge');
+      }}
+    />
+  ), []);
+
+  const ChallengeComponent = useMemo(() => (props: any) => (
+    <ChallengeScreen
+      onContinue={(challenge: any) => {
+        setUserData((prev: any) => ({ ...prev, challenge }));
+        props.navigation.navigate('Expectations');
+      }}
+    />
+  ), []);
+
+  const ExpectationsComponent = useMemo(() => (props: any) => (
+    <ExpectationsScreen
+      onContinue={(expectations: any) => {
+        setUserData((prev: any) => ({ ...prev, expectations }));
+        props.navigation.navigate('Birthdate');
+      }}
+    />
+  ), []);
+
+  // No changes needed here, just for context range
+  const BirthdateComponent = useMemo(() => (props: any) => (
+    <BirthdateScreen
+      onBack={() => props.navigation.goBack()}
+      onContinue={(date: any) => {
+        const fullData = { ...userDataRef.current, birthdate: date.toISOString() };
+        setUserData(fullData);
+        props.navigation.navigate('Calculating', { userData: fullData });
+      }}
+    />
+  ), []);
+
+  const hasPersistedData = useMemo(() => !!(userProfile && numerologyResults), [userProfile, numerologyResults]);
+  const initialRouteName = hasPersistedData ? "MainTabs" : "Welcome";
+
+  // Prepare params if we have persisted data
+  const initialParams = useMemo(() => hasPersistedData ? {
+    ...userProfile,
+    ...(numerologyResults as any)
+  } : undefined, [hasPersistedData, userProfile, numerologyResults]);
+
+  if (isUserLoading || isRcLoading || !splashFinished || !ready) {
     return (
       <SplashScreen onFinish={() => setSplashFinished(true)} />
     );
   }
-
-  const hasPersistedData = userProfile && numerologyResults;
-  const initialRouteName = hasPersistedData ? "MainTabs" : "Welcome";
-
-  // Prepare params if we have persisted data
-  const initialParams = hasPersistedData ? {
-    ...userProfile,
-    ...numerologyResults
-  } : undefined;
 
   return (
     <NavigationContainer ref={props.navigationRef}>
@@ -113,159 +231,25 @@ const AppContent = (props: { navigationRef: any }) => {
         }}
         initialRouteName={initialRouteName}
       >
-        {/* Only show Splash/Onboarding screens if we don't have persisted data, 
-            OR if we want to allow navigation back to them (though replacement usually prevents this).
-            Actually, we should include them so the routes exist. */}
-
-        <Stack.Screen name="Splash">
-          {(props) => (
-            // If we are here, it means we don't have data (or explicit nav). 
-            // We can just immediately replace since we already showed the splash.
-            // But wait, if initialRouteName="Splash", it will mount this.
-            // And this Splash calls onFinish which replaces with Welcome.
-            // Since we already showed a "loading splash", we might want to skip this one 
-            // and go straight to Welcome? 
-            // Logic: If initialRouteName="Splash", it renders this.
-            // This renders <SplashScreen />. 
-            // Current SplashScreen implementation runs animation then calls onFinish.
-            // If we already waited for splashFinished, showing it AGAIN might be redundant 
-            // but acceptable for "intro". 
-            // Let's keep it simple. If we are starting fresh, show the Splash flow.
-            <SplashScreen onFinish={() => props.navigation.replace('Welcome')} />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Welcome">
-          {(props) => (
-            <WelcomeScreen onStart={() => props.navigation.navigate('Language')} />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Language">
-          {(props) => (
-            <LanguageScreen
-              onContinue={(lang) => {
-                setUserData({ ...userData, language: lang });
-                props.navigation.navigate('Identity');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Identity">
-          {(props) => (
-            <IdentityScreen
-              onBack={() => props.navigation.goBack()}
-              onContinue={(identity) => {
-                setUserData({ ...userData, identity });
-                props.navigation.navigate('Name');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Name">
-          {(props) => (
-            <NameScreen
-              onBack={() => props.navigation.goBack()}
-              onContinue={(name) => {
-                setUserData({ ...userData, name });
-                props.navigation.navigate('BirthTime');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="BirthTime">
-          {(props) => (
-            <BirthTimeScreen
-              onContinue={(knowsTime) => {
-                setUserData({ ...userData, knowsBirthTime: knowsTime });
-                props.navigation.navigate('Relationship');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Relationship">
-          {(props) => (
-            <RelationshipScreen
-              onContinue={(status) => {
-                setUserData({ ...userData, relationshipStatus: status });
-                props.navigation.navigate('Focus');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Focus">
-          {(props) => (
-            <FocusScreen
-              onContinue={(focus) => {
-                setUserData({ ...userData, focus });
-                props.navigation.navigate('Challenge');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Challenge">
-          {(props) => (
-            <ChallengeScreen
-              onContinue={(challenge) => {
-                setUserData({ ...userData, challenge });
-                props.navigation.navigate('Expectations');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Expectations">
-          {(props) => (
-            <ExpectationsScreen
-              onContinue={(expectations) => {
-                setUserData({ ...userData, expectations });
-                props.navigation.navigate('Birthdate');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Birthdate">
-          {(props) => (
-            <BirthdateScreen
-              onBack={() => props.navigation.goBack()}
-              onContinue={(date) => {
-                const updatedData = { ...userData, birthdate: date.toISOString() };
-                setUserData(updatedData);
-                props.navigation.navigate('Calculating');
-              }}
-            />
-          )}
-        </Stack.Screen>
-
-        <Stack.Screen name="Calculating">
-          {(props) => (
-            <CalculatingScreen
-              userData={userData}
-              onFinish={(results) => {
-                props.navigation.replace('AnalysisComplete', results);
-              }}
-            />
-          )}
-        </Stack.Screen>
-
+        <Stack.Screen name="Welcome" component={WelcomeComponent} />
+        <Stack.Screen name="Language" component={LanguageComponent} />
+        <Stack.Screen name="Identity" component={IdentityComponent} />
+        <Stack.Screen name="Name" component={NameComponent} />
+        <Stack.Screen name="BirthTime" component={BirthTimeComponent} />
+        <Stack.Screen name="Relationship" component={RelationshipComponent} />
+        <Stack.Screen name="Focus" component={FocusComponent} />
+        <Stack.Screen name="Challenge" component={ChallengeComponent} />
+        <Stack.Screen name="Expectations" component={ExpectationsComponent} />
+        <Stack.Screen name="Birthdate" component={BirthdateComponent} />
+        <Stack.Screen name="Calculating" component={CalculatingScreenWrapper} />
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
-
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
-
         <Stack.Screen
           name="MainTabs"
-          component={MainTabNavigator}
+          component={MainTabs}
           initialParams={initialParams}
         />
-
       </Stack.Navigator>
     </NavigationContainer>
   );

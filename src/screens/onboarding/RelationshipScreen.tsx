@@ -27,7 +27,12 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
         <GradientBackground style={styles.container}>
             <OnboardingHeader step={5} totalSteps={10} />
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
                 <MysticalText variant="h1" style={styles.title}>
                     What is your {'\n'}
                     <MysticalText variant="h1" color={Colors.primary}>relationship status?</MysticalText>

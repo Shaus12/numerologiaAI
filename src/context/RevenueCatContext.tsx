@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
 import Purchases, { CustomerInfo, PurchasesPackage, LOG_LEVEL } from 'react-native-purchases';
 import RevenueCatUI from 'react-native-purchases-ui';
 import { RevenueCatConfig } from '../constants/RevenueCat';
@@ -32,23 +32,84 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const isPro = customerInfo?.entitlements.active[RevenueCatConfig.entitlementId] !== undefined ||
-        Object.keys(customerInfo?.entitlements.active || {}).length > 0;
+    const prevEntitlementKeysRef = useRef<string>('');
+
+    const isPro = useMemo(() => {
+        if (!customerInfo || !customerInfo.entitlements) {
+            return false;
+        }
+
+        const activeEntitlements = customerInfo.entitlements.active || {};
+        const activeIds = Object.keys(activeEntitlements);
+
+        // 1. Check primary ID
+        let hasEntitlement = activeEntitlements[RevenueCatConfig.entitlementId] !== undefined;
+
+        // 2. Check alternative IDs
+        if (!hasEntitlement && RevenueCatConfig.alternativeIds) {
+            hasEntitlement = RevenueCatConfig.alternativeIds.some(id => activeEntitlements[id] !== undefined);
+        }
+
+        // 3. Fallback: If they have ANY active subscription but entitlement mapping is broken,
+        // we might want to allow access anyway during debugging/soft launch.
+        const hasAnyActiveSub = (customerInfo.activeSubscriptions || []).length > 0;
+
+        return hasEntitlement || activeIds.length > 0 || hasAnyActiveSub;
+    }, [customerInfo]);
+
+    const smartSetCustomerInfo = useCallback((info: CustomerInfo) => {
+        try {
+            if (!info || !info.entitlements) return;
+
+            // Deep-ish check: check active entitlement keys and expiration dates if available
+            // This prevents the re-render loop when RevenueCat spams progress updates
+            const newKeys = Object.keys(info.entitlements.active || {}).sort().join(',');
+            const expirationDates = Object.values(info.entitlements.active || {})
+                .map(e => e.expirationDate)
+                .sort()
+                .join(',');
+
+            const stateString = `${newKeys}|${expirationDates}`;
+
+            setCustomerInfo(prev => {
+                const prevKeys = Object.keys(prev?.entitlements?.active || {}).sort().join(',');
+                const prevExp = Object.values(prev?.entitlements?.active || {})
+                    .map(e => e.expirationDate)
+                    .sort()
+                    .join(',');
+                const prevStateString = `${prevKeys}|${prevExp}`;
+
+                if (stateString !== prevStateString || !prev) {
+                    prevEntitlementKeysRef.current = newKeys;
+                    return info;
+                }
+                return prev;
+            });
+        } catch (e) {
+            console.error('Error in smartSetCustomerInfo:', e);
+        }
+    }, []);
 
     useEffect(() => {
         const init = async () => {
             try {
                 if (Platform.OS === 'android' || Platform.OS === 'ios') {
-                    Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+                    Purchases.setLogLevel(LOG_LEVEL.WARN);
                     const isConfigured = await Purchases.isConfigured();
                     if (!isConfigured) {
-                        Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+                        try {
+                            Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+                        } catch (confError) {
+                            console.error('RevenueCat configure error:', confError);
+                        }
                     }
 
                     const info = await Purchases.getCustomerInfo();
-                    console.log('RevenueCat Init - CustomerInfo:', JSON.stringify(info, null, 2));
-                    console.log('RevenueCat Init - Active Entitlements:', info.entitlements.active);
-                    setCustomerInfo(info);
+                    if (info) {
+                        console.log('[RevenueCat] Initial CustomerInfo loaded, active:', Object.keys(info.entitlements.active || {}).join(',') || 'none');
+                        prevEntitlementKeysRef.current = Object.keys(info.entitlements.active || {}).sort().join(',');
+                        setCustomerInfo(info);
+                    }
                 }
             } catch (e) {
                 console.error('RevenueCat init error:', e);
@@ -57,96 +118,96 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
             }
         };
 
-        init();
+        const timer = setTimeout(init, 500); // Slight delay to ensure bridge is ready
 
         const updateListener = (info: CustomerInfo) => {
-            console.log('RevenueCat Update Listener - Info:', JSON.stringify(info, null, 2));
-            console.log('RevenueCat Update Listener - IsPro:', info.entitlements.active[RevenueCatConfig.entitlementId] !== undefined);
-            setCustomerInfo(info);
+            smartSetCustomerInfo(info);
         };
 
-        Purchases.addCustomerInfoUpdateListener(updateListener);
+        try {
+            Purchases.addCustomerInfoUpdateListener(updateListener);
+        } catch (le) {
+            console.error('Failed to add RevenueCat listener:', le);
+        }
 
         return () => {
-            Purchases.removeCustomerInfoUpdateListener(updateListener);
+            clearTimeout(timer);
+            try {
+                Purchases.removeCustomerInfoUpdateListener(updateListener);
+            } catch (le) {
+                console.error('Failed to remove RevenueCat listener:', le);
+            }
         };
-    }, []);
+    }, [smartSetCustomerInfo]);
 
-    const purchasePackage = async (pack: PurchasesPackage) => {
+    const purchasePackage = useCallback(async (pack: PurchasesPackage) => {
         try {
-            const { customerInfo } = await Purchases.purchasePackage(pack);
-            console.log('Purchase Successful - CustomerInfo:', JSON.stringify(customerInfo, null, 2));
-            setCustomerInfo(customerInfo);
+            const { customerInfo: info } = await Purchases.purchasePackage(pack);
+            if (info && info.entitlements && info.entitlements.active) {
+                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
+                setCustomerInfo(info);
+            }
         } catch (e: any) {
             console.error('Purchase error:', e);
             throw e;
         }
-    };
+    }, []);
 
-    const restorePurchases = async () => {
+    const restorePurchases = useCallback(async () => {
         try {
             const info = await Purchases.restorePurchases();
-            setCustomerInfo(info);
+            if (info && info.entitlements && info.entitlements.active) {
+                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
+                setCustomerInfo(info);
+            }
             return info;
         } catch (e) {
             console.error('Restore error:', e);
             return null;
         }
-    };
+    }, []);
 
-    const presentPaywall = async (): Promise<boolean> => {
+    const presentPaywall = useCallback(async (): Promise<boolean> => {
         try {
-            const result = await RevenueCatUI.presentPaywallIfNeeded({
-                requiredEntitlementIdentifier: RevenueCatConfig.entitlementId,
-            });
-
-            const success =
-                result === RevenueCatUI.PAYWALL_RESULT.PURCHASED ||
-                result === RevenueCatUI.PAYWALL_RESULT.RESTORED ||
-                result === RevenueCatUI.PAYWALL_RESULT.NOT_PRESENTED; // NOT_PRESENTED = already subscribed
-
-            if (success) {
-                // Immediately refresh and update global state
-                const info = await Purchases.getCustomerInfo();
-                setCustomerInfo(info);
-            }
-            return success;
+            await RevenueCatUI.presentPaywall();
         } catch (e) {
             console.error('Paywall presentation error:', e);
+        }
+
+        try {
+            const info = await Purchases.getCustomerInfo();
+            if (info && info.entitlements && info.entitlements.active) {
+                prevEntitlementKeysRef.current = Object.keys(info.entitlements.active).sort().join(',');
+                setCustomerInfo(info);
+                return Object.keys(info.entitlements.active).length > 0;
+            }
+            return false;
+        } catch (e) {
+            console.error('Error refreshing customer info after paywall:', e);
             return false;
         }
-    };
+    }, []);
 
-    const presentCustomerCenter = async () => {
+    const presentCustomerCenter = useCallback(async () => {
         try {
-            if (Platform.OS === 'ios') {
-                // Customer Center is currently iOS only in some versions of the SDK, 
-                // but checking docs, react-native-purchases-ui supports it if available.
-                // If not available, we can fallback to managing subscription via linking.
-                await RevenueCatUI.presentCustomerCenter();
-            } else {
-                // Fallback for Android or if Customer Center isn't fully supported yet on Android in this version
-                // RevenueCatUI might handle this gracefully or we might need to link to Play Store.
-                // For now, let's try the UI method.
-                await RevenueCatUI.presentCustomerCenter();
-            }
+            await RevenueCatUI.presentCustomerCenter();
         } catch (e) {
-            console.error("Customer Center not supported or error:", e);
+            console.error('Customer Center not supported or error:', e);
         }
-    };
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        customerInfo,
+        isPro,
+        isLoading,
+        purchasePackage,
+        restorePurchases,
+        presentPaywall,
+        presentCustomerCenter,
+    }), [customerInfo, isPro, isLoading, purchasePackage, restorePurchases, presentPaywall, presentCustomerCenter]);
 
     return (
-        <RevenueCatContext.Provider
-            value={{
-                customerInfo,
-                isPro,
-                isLoading,
-                purchasePackage,
-                restorePurchases,
-                presentPaywall,
-                presentCustomerCenter,
-            }}
-        >
+        <RevenueCatContext.Provider value={contextValue}>
             {children}
         </RevenueCatContext.Provider>
     );

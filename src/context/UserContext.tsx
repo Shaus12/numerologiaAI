@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the shape of UserProfile
@@ -46,7 +46,7 @@ interface UserProviderProps {
   children: ReactNode;
 }
 
-export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
+export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [numerologyResults, setNumerologyResults] = useState<NumerologyResults | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,15 +55,31 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const storedProfile = await AsyncStorage.getItem('userProfile');
-        const storedResults = await AsyncStorage.getItem('numerologyResults');
+        const [storedProfile, storedResults] = await Promise.all([
+          AsyncStorage.getItem('userProfile'),
+          AsyncStorage.getItem('numerologyResults')
+        ]);
 
         if (storedProfile) {
-          setUserProfile(JSON.parse(storedProfile));
+          try {
+            const parsed = JSON.parse(storedProfile);
+            if (parsed && typeof parsed === 'object') {
+              setUserProfile(parsed);
+            }
+          } catch (pe) {
+            console.error('Failed to parse userProfile JSON:', pe);
+          }
         }
 
         if (storedResults) {
-          setNumerologyResults(JSON.parse(storedResults));
+          try {
+            const parsed = JSON.parse(storedResults);
+            if (parsed && typeof parsed === 'object') {
+              setNumerologyResults(parsed);
+            }
+          } catch (pe) {
+            console.error('Failed to parse numerologyResults JSON:', pe);
+          }
         }
       } catch (error) {
         console.error('Failed to load user data from storage:', error);
@@ -75,48 +91,50 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     loadData();
   }, []);
 
-  const saveUserProfile = async (profile: UserProfile) => {
+  const saveUserProfile = useCallback(async (profile: UserProfile) => {
     try {
+      if (!profile) return;
       await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
       setUserProfile(profile);
     } catch (error) {
       console.error('Failed to save user profile:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const saveNumerologyResults = async (results: NumerologyResults) => {
+  const saveNumerologyResults = useCallback(async (results: NumerologyResults) => {
     try {
+      if (!results) return;
       await AsyncStorage.setItem('numerologyResults', JSON.stringify(results));
       setNumerologyResults(results);
     } catch (error) {
       console.error('Failed to save numerology results:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const clearUserData = async () => {
+  const clearUserData = useCallback(async () => {
     try {
-      await AsyncStorage.clear();
+      await AsyncStorage.multiRemove(['userProfile', 'numerologyResults', 'user_language']);
       setUserProfile(null);
       setNumerologyResults(null);
     } catch (error) {
       console.error('Failed to clear user data:', error);
       throw error;
     }
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    userProfile,
+    numerologyResults,
+    isLoading,
+    saveUserProfile,
+    saveNumerologyResults,
+    clearUserData,
+  }), [userProfile, numerologyResults, isLoading, saveUserProfile, saveNumerologyResults, clearUserData]);
 
   return (
-    <UserContext.Provider
-      value={{
-        userProfile,
-        numerologyResults,
-        isLoading,
-        saveUserProfile,
-        saveNumerologyResults,
-        clearUserData,
-      }}
-    >
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

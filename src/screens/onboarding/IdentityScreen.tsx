@@ -34,7 +34,11 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
         <GradientBackground style={styles.container}>
             <OnboardingHeader step={2} totalSteps={10} onBack={onBack} />
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                style={styles.scroll}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.header}>
                     <MysticalText variant="h1" style={styles.title}>
                         How do you {'\n'}

@@ -48,45 +48,69 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
 
         // Parallel calculations and AI generation
         const process = async () => {
-            const lifePath = NumerologyEngine.calculateLifePath(userData.birthdate);
-            const destiny = NumerologyEngine.calculateDestiny(userData.name);
-            const soulUrge = NumerologyEngine.calculateSoulUrge(userData.name);
-            const personality = NumerologyEngine.calculatePersonality(userData.name);
-            const personalYear = NumerologyEngine.calculatePersonalYear(userData.birthdate);
-            const dailyNumber = NumerologyEngine.calculateDailyNumber(personalYear);
+            try {
+                if (!userData || !userData.birthdate || !userData.name) {
+                    console.error('Missing mandatory userData for calculation:', userData);
+                    // If we are missing critical data, we can't calculate. 
+                    // Let's at least allow a fallback or just wait for timeout.
+                }
 
-            const reading = await AIService.generateReading({
-                name: userData.name,
-                birthdate: userData.birthdate,
-                lifePath,
-                destiny,
-                soulUrge,
-                personality,
-                language: userData.language
-            });
+                const lifePath = NumerologyEngine.calculateLifePath(userData.birthdate || new Date().toISOString());
+                const destiny = NumerologyEngine.calculateDestiny(userData.name || 'Seeker');
+                const soulUrge = NumerologyEngine.calculateSoulUrge(userData.name || 'Seeker');
+                const personality = NumerologyEngine.calculatePersonality(userData.name || 'Seeker');
+                const personalYear = NumerologyEngine.calculatePersonalYear(userData.birthdate || new Date().toISOString());
+                const dailyNumber = NumerologyEngine.calculateDailyNumber(personalYear);
 
-            const results = {
-                lifePath,
-                destiny,
-                soulUrge,
-                personality,
-                reading,
-                personalYear,
-                dailyNumber
-            };
+                let reading = "Your celestial blueprint is being prepared...";
+                try {
+                    reading = await AIService.generateReading({
+                        name: userData.name || 'Seeker',
+                        birthdate: userData.birthdate || new Date().toISOString(),
+                        lifePath,
+                        destiny,
+                        soulUrge,
+                        personality,
+                        language: userData.language || 'English'
+                    });
+                } catch (aiError) {
+                    console.error('AI Reading Error:', aiError);
+                    // Continue with default reading if AI fails
+                }
 
-            // Save to persistence
-            await saveUserProfile(userData);
-            await saveNumerologyResults(results);
+                const results = {
+                    lifePath,
+                    destiny,
+                    soulUrge,
+                    personality,
+                    reading,
+                    personalYear,
+                    dailyNumber
+                };
 
-            // Ensure we stay on screen for at least a few seconds for effect
-            setTimeout(() => {
-                onFinish({
-                    name: userData.name,
-                    ...results,
-                    language: userData.language,
-                });
-            }, 6000);
+                // Save to persistence
+                try {
+                    await saveUserProfile(userData);
+                    await saveNumerologyResults(results);
+                } catch (saveError) {
+                    console.error('Data Save Error:', saveError);
+                }
+
+                // Ensure we stay on screen for at least a few seconds for effect
+                setTimeout(() => {
+                    onFinish({
+                        name: userData.name || 'Seeker',
+                        ...results,
+                        language: userData.language || 'English',
+                    });
+                }, 6000);
+            } catch (error) {
+                console.error('CRITICAL CALCULATION ERROR:', error);
+                // Last resort: escape hatch to allow user to continue even with errors
+                setTimeout(() => {
+                    onFinish(null);
+                }, 8000);
+            }
         };
 
         process();
@@ -105,10 +129,13 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
     return (
         <GradientBackground style={styles.container}>
             <View style={styles.content}>
-                <Animated.View style={[styles.loaderContainer, { transform: [{ rotate: spin }] }]}>
-                    <View style={styles.outerCircle} />
-                    <View style={styles.innerCircle} />
-                    <View style={styles.dot} />
+                <Animated.View
+                    style={[styles.loaderContainer, { transform: [{ rotate: spin }] }]}
+                    pointerEvents="none"
+                >
+                    <View style={styles.outerCircle} pointerEvents="none" />
+                    <View style={styles.innerCircle} pointerEvents="none" />
+                    <View style={styles.dot} pointerEvents="none" />
                 </Animated.View>
 
                 <MysticalText variant="h2" style={styles.title}>

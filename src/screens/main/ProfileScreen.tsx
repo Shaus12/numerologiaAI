@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, TouchableOpacity, Image, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image, Alert, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -12,7 +13,6 @@ import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useSettings } from '../../context/SettingsContext';
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { Switch } from 'react-native';
 import { NotificationService } from '../../services/notificationService';
 import Purchases from 'react-native-purchases';
 import { useUser } from '../../context/UserContext';
@@ -105,9 +105,17 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     return (
         <GradientBackground style={styles.container}>
             <SafeAreaView style={styles.safe}>
-                <ScrollView contentContainerStyle={styles.scroll}>
+                <ScrollView
+                    contentContainerStyle={styles.scroll}
+                    keyboardShouldPersistTaps="handled"
+                >
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={pickImage} activeOpacity={0.8} style={styles.avatarBorder}>
+                        <TouchableOpacity
+                            onPress={pickImage}
+                            activeOpacity={0.8}
+                            style={styles.avatarBorder}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
                             {image ? (
                                 <Image source={{ uri: image }} style={styles.avatarImage} />
                             ) : (
@@ -142,7 +150,11 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     )}
 
                     <View style={styles.detailsSection}>
-                        <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+                        <TouchableOpacity
+                            style={styles.settingsButton}
+                            onPress={() => navigation.navigate('Settings')}
+                            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                        >
                             <Settings color={Colors.textSecondary} size={20} />
                             <MysticalText style={styles.settingsText}>{t('settings')}</MysticalText>
                         </TouchableOpacity>

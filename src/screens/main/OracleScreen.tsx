@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TextInput, ScrollView, SafeAreaView, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList } from 'react-native';
+import { StyleSheet, View, TextInput, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -31,7 +32,7 @@ interface Message {
 
 export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     const { language, t } = useSettings();
-    const { isPro, purchasePackage } = useRevenueCat();
+    const { isPro } = useRevenueCat();
     const { userProfile, numerologyResults } = useUser();
 
     // Use context (persistent) data as primary, route.params as fallback
@@ -129,7 +130,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
 
     return (
         <GradientBackground>
-            <SafeAreaView style={styles.safe}>
+            <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.keyboardView}
@@ -137,7 +138,11 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                 >
                     <View style={{ flex: 1 }}>
                         <View style={styles.header}>
-                            <TouchableOpacity onPress={() => setShowHistory(true)} style={styles.historyBtn}>
+                            <TouchableOpacity
+                                onPress={() => setShowHistory(true)}
+                                style={styles.historyBtn}
+                                hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                            >
                                 <History color={Colors.textSecondary} size={24} />
                             </TouchableOpacity>
                             <View style={styles.headerTitle}>

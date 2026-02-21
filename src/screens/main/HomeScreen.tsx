@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -86,11 +87,12 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     ref={scrollViewRef}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
 
                     {/* Header Section */}
                     <View style={styles.header}>
-                        <MysticalText style={styles.welcomeText}>Welcome back !!!</MysticalText>
+                        <MysticalText style={styles.welcomeText}>Welcome back!</MysticalText>
                         <MysticalText variant="h1" style={styles.nameText}>{name || t('seeker')}</MysticalText>
                         <MysticalText style={styles.dateText}>{formattedDate}</MysticalText>
                     </View>
@@ -173,6 +175,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={() => navigation.navigate('Oracle', { lifePath, language })}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                         <GlassCard style={styles.oracleCTA}>
                             <View style={styles.oracleIconBox}>

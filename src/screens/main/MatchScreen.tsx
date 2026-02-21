@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Platform, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -27,7 +28,7 @@ type MatchStep = 'input' | 'scanning' | 'result';
 
 export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     const { language, t } = useSettings();
-    const { isPro, purchasePackage } = useRevenueCat();
+    const { isPro } = useRevenueCat();
     const { userProfile, numerologyResults } = useUser();
 
     // Use context (persistent) data as primary, route.params as fallback
@@ -141,7 +142,10 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
                 )}
 
                 {step === 'result' && (
-                    <ScrollView contentContainerStyle={styles.scroll}>
+                    <ScrollView
+                        contentContainerStyle={styles.scroll}
+                        keyboardShouldPersistTaps="handled"
+                    >
                         <View style={styles.header}>
                             <Sparkles color={Colors.primary} size={32} />
                             <MysticalText variant="h1">{t('theVerdict')}</MysticalText>

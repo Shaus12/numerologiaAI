@@ -25,7 +25,10 @@ export const SettingsScreen = () => {
                     <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView contentContainerStyle={styles.content}>
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
                     <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('languageTitle')}</MysticalText>
 
                     <GlassCard style={styles.card}>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { translations, Language } from '../utils/translations';
@@ -23,7 +23,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const loadSettings = async () => {
         try {
             const savedLang = await AsyncStorage.getItem('user_language');
-            if (savedLang) {
+            // Strict check: only update if the saved language exists in our translations
+            if (savedLang && translations[savedLang as Language]) {
                 setLanguageState(savedLang as Language);
             }
         } catch (error) {
@@ -31,24 +32,36 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     };
 
-    const setLanguage = async (lang: Language) => {
+    const setLanguage = useCallback(async (lang: Language) => {
         try {
-            setLanguageState(lang);
-            await AsyncStorage.setItem('user_language', lang);
+            if (translations[lang]) {
+                setLanguageState(lang);
+                await AsyncStorage.setItem('user_language', lang);
+            }
         } catch (error) {
             console.error('Failed to save settings:', error);
         }
-    };
+    }, []);
 
-    const t = (key: string) => {
-        return translations[language][key] || translations['English'][key] || key;
-    };
+    const t = useCallback((key: string) => {
+        const currentTranslation = translations[language] || translations['English'];
+        if (!currentTranslation) return key;
+        return currentTranslation[key] || translations['English'][key] || key;
+    }, [language]);
 
-    const isRTL = language === 'Hebrew';
-    const textDirection = isRTL ? 'right' : 'left';
+    const isRTL = useMemo(() => language === 'Hebrew', [language]);
+    const textDirection = useMemo(() => (isRTL ? 'right' : 'left') as 'left' | 'right', [isRTL]);
+
+    const contextValue = useMemo(() => ({
+        language,
+        setLanguage,
+        t,
+        isRTL,
+        textDirection
+    }), [language, setLanguage, t, isRTL, textDirection]);
 
     return (
-        <SettingsContext.Provider value={{ language, setLanguage, t, isRTL, textDirection }}>
+        <SettingsContext.Provider value={contextValue}>
             {children}
         </SettingsContext.Provider>
     );

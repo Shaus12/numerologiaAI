@@ -1,112 +1,111 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, SafeAreaView, BackHandler } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, BackHandler, Share as RNShare, Alert, InteractionManager } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { ChevronRight, Lock, Share } from 'lucide-react-native';
-import { Share as RNShare } from 'react-native';
+import { Sparkles, Share2, CheckCircle2, ChevronRight, Lock } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useRevenueCat } from '../../context/RevenueCatContext';
+import { useSettings } from '../../context/SettingsContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
-import { NotificationService } from '../../services/notificationService';
-
 export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) => {
-    const { lifePath } = route.params;
-    const { presentPaywall } = useRevenueCat();
+    const { t } = useSettings();
+    const { isPro, presentPaywall } = useRevenueCat();
+    const results = route.params || {};
 
-    // Block hardware back button - user must subscribe
-    React.useEffect(() => {
-        const handler = BackHandler.addEventListener('hardwareBackPress', () => true);
-        return () => handler.remove();
+    // Prevent going back during this critical success state
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
+        return () => backHandler.remove();
     }, []);
-
-    // Directly handle the CTA tap — no state-timing race
-    const handleClaimTrial = async () => {
-        const purchased = await presentPaywall();
-        if (purchased) {
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'MainTabs', params: route.params }],
-            });
-        }
-    };
 
     const handleShare = async () => {
         try {
             await RNShare.share({
-                message: `I discovered my Life Path Number is ${lifePath} - The Powerhouse! ✨\n\nUnlock your own detailed numerology report with Numerologia AI.`,
-                title: 'My Numerology Analysis'
+                message: `I just discovered my Life Path is ${results.lifePath}! The Powerhouse.\n\nUnlock your own detailed numerology report with Numerologia AI.`,
             });
         } catch (error) {
-            console.error(error);
+            console.error('Share error:', error);
         }
     };
 
-    React.useEffect(() => {
-        const setupNotifications = async () => {
-            const granted = await NotificationService.requestPermissions();
-            if (granted) {
-                await NotificationService.scheduleDailyReminder();
-            }
-        };
-        setupNotifications();
-    }, []);
+    const handleContinue = () => {
+        // Prioritize interaction/feedback over screen replacement logic
+        InteractionManager.runAfterInteractions(() => {
+            // Reset to main tabs
+            navigation.replace('MainTabs', results);
+        });
+    };
+
+    const reading = results.reading || 'Your celestial path is being revealed...';
 
     return (
-        <GradientBackground style={styles.container}>
-            <SafeAreaView style={styles.safe}>
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.header}>
-                        <MysticalText variant="caption" style={styles.headerLabel}>ANALYSIS COMPLETE</MysticalText>
-                        <MysticalText variant="subtitle" style={styles.subLabel}>YOUR LIFE PATH NUMBER</MysticalText>
+        <GradientBackground>
+            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.successIcon}>
+                        <CheckCircle2 color={Colors.primary} size={64} />
                     </View>
 
-                    <View style={styles.heroCircle}>
-                        <View style={styles.glow} />
-                        <MysticalText style={styles.lifePathValue}>{lifePath}</MysticalText>
-                        <MysticalText variant="h2" style={styles.lifePathTitle}>The Powerhouse</MysticalText>
-                        <View style={styles.tag}>
-                            <MysticalText variant="caption" style={styles.tagText}>ABUNDANCE & ACHIEVEMENT</MysticalText>
+                    <MysticalText variant="h1" style={styles.title}>
+                        {t('analysisComplete')}
+                    </MysticalText>
+                    <MysticalText variant="body" style={styles.subtitle}>
+                        {t('blueprintReady')}
+                    </MysticalText>
+
+                    <GlassCard style={styles.resultCard}>
+                        <View style={styles.nodeHeader}>
+                            <Sparkles color={Colors.primary} size={20} />
+                            <MysticalText variant="subtitle" style={styles.nodeTitle}>
+                                {t('lifePath')} {results.lifePath}
+                            </MysticalText>
                         </View>
-                        <MysticalText variant="body" style={styles.heroDescription}>
-                            You are destined for material success and authority. Your path involves manifesting abundance and wielding power wisely.
+                        <MysticalText variant="body" style={styles.readingText}>
+                            {reading}
                         </MysticalText>
+                    </GlassCard>
 
-                    </View>
+                    {!isPro && (
+                        <TouchableOpacity style={styles.proUpgradeCard} onPress={presentPaywall}>
+                            <GlassCard style={styles.proUpgradeInner}>
+                                <View style={styles.proHeader}>
+                                    <Sparkles color={Colors.primary} size={24} />
+                                    <MysticalText variant="subtitle" style={styles.proTitle}>
+                                        {t('unlockFullProExperience')}
+                                    </MysticalText>
+                                </View>
+                                <MysticalText variant="caption" style={styles.proDescription}>
+                                    Unlock daily transits, advanced compatibility, and personalized AI oracle insights.
+                                </MysticalText>
+                                <View style={styles.proButton}>
+                                    <MysticalText style={styles.proButtonText}>Upgrade to Pro</MysticalText>
+                                    <ChevronRight color="#000" size={18} />
+                                </View>
+                            </GlassCard>
+                        </TouchableOpacity>
+                    )}
 
-                    <View style={styles.lockedSection}>
-                        <MysticalText variant="subtitle" style={styles.lockedTitle}>DEEP INSIGHTS LOCKED</MysticalText>
-
-                        <LockedItem
-                            title="Destiny Number Analysis"
-                            subtitle="Your soul's purpose revealed"
-                        />
-                        <LockedItem
-                            title="Personal Year 2026"
-                            subtitle="What this year holds for you"
-                        />
-                        <LockedItem
-                            title="Love Compatibility"
-                            subtitle="Your ideal partner numbers"
-                        />
-                    </View>
-
-                    <View style={styles.footer}>
+                    <View style={styles.actions}>
                         <Button
-                            title="Claim Your 7-Day Free Trial"
-                            onPress={handleClaimTrial}
+                            title={t('viewDashboard')}
+                            onPress={handleContinue}
+                            variant="primary"
                         />
-                        <MysticalText variant="caption" style={styles.footerNote}>
-                            25+ pages of personalized insights • Cancel anytime
-                        </MysticalText>
-                        <TouchableOpacity style={styles.shareAnalysisBtn} onPress={handleShare}>
-                            <Share size={15} color={Colors.secondary} style={{ marginRight: 8 }} />
-                            <MysticalText variant="caption" style={styles.shareText}>SHARE MY PATH</MysticalText>
+
+                        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                            <Share2 color={Colors.primary} size={20} />
+                            <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -115,144 +114,122 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
     );
 };
 
-const LockedItem = ({ title, subtitle }: { title: string; subtitle: string }) => (
-    <TouchableOpacity activeOpacity={0.7}>
-        <GlassCard style={styles.lockedItem}>
-            <View style={styles.lockIconBox}>
-                <Lock color={Colors.textSecondary} size={20} />
-            </View>
-            <View style={styles.lockedItemContent}>
-                <MysticalText variant="body" style={styles.itemName}>{title}</MysticalText>
-                <MysticalText variant="caption" style={styles.itemSub}>{subtitle}</MysticalText>
-            </View>
-            <ChevronRight color={Colors.textSecondary} size={20} />
-        </GlassCard>
-    </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    safe: {
-        flex: 1,
-    },
     scrollContent: {
-        paddingBottom: 40,
-    },
-    header: {
+        padding: 24,
         alignItems: 'center',
-        paddingTop: 30,
-        marginBottom: 20,
+        paddingTop: 40,
     },
-    headerLabel: {
-        color: Colors.primary,
-        letterSpacing: 2,
-        fontWeight: '700',
-        marginBottom: 20,
+    successIcon: {
+        marginBottom: 24,
     },
-    subLabel: {
-        fontSize: 14,
-        color: Colors.textSecondary,
-        letterSpacing: 2,
-    },
-    heroCircle: {
-        alignItems: 'center',
-        paddingHorizontal: 40,
-        marginBottom: 30,
-    },
-    glow: {
-        position: 'absolute',
-        width: 250,
-        height: 250,
-        borderRadius: 125,
-        backgroundColor: Colors.secondary,
-        opacity: 0.2,
-        top: -20,
-    },
-    lifePathValue: {
-        fontSize: 80,
-        fontWeight: '700',
-        color: Colors.primary,
-        lineHeight: 90,
-    },
-    lifePathTitle: {
-        marginBottom: 10,
-    },
-    tag: {
-        backgroundColor: 'rgba(155, 89, 182, 0.2)',
-        paddingHorizontal: 15,
-        paddingVertical: 5,
-        borderRadius: 20,
-        marginBottom: 20,
-    },
-    tagText: {
-        color: Colors.secondary,
-        fontWeight: '700',
-    },
-    heroDescription: {
+    title: {
         textAlign: 'center',
-        lineHeight: 22,
-        opacity: 0.8,
-        marginBottom: 20,
+        marginBottom: 8,
     },
-    shareAnalysisBtn: {
+    subtitle: {
+        textAlign: 'center',
+        opacity: 0.7,
+        marginBottom: 32,
+    },
+    resultCard: {
+        width: '100%',
+        padding: 24,
+        marginBottom: 40,
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    nodeHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        gap: 8,
+        marginBottom: 16,
     },
-    shareText: {
-        color: Colors.secondary,
+    nodeTitle: {
+        color: Colors.primary,
+        fontSize: 18,
         fontWeight: '700',
-        letterSpacing: 1,
     },
-    lockedSection: {
-        paddingHorizontal: 25,
+    readingText: {
+        lineHeight: 24,
+        opacity: 0.9,
     },
-    lockedTitle: {
-        fontSize: 14,
-        color: Colors.textSecondary,
-        fontWeight: '700',
-        marginBottom: 15,
-        letterSpacing: 1,
-    },
-    lockedItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        marginBottom: 12,
-    },
-    lockIconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+    lockOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(10, 6, 18, 0.85)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 15,
     },
-    lockedItemContent: {
-        flex: 1,
+    lockContent: {
+        alignItems: 'center',
+        padding: 20,
     },
-    itemName: {
+    unlockTitle: {
+        color: Colors.primary,
+        marginTop: 12,
+        marginBottom: 4,
+    },
+    unlockSub: {
+        color: Colors.textSecondary,
+        textAlign: 'center',
+    },
+    actions: {
+        width: '100%',
+        gap: 16,
+    },
+    shareBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        padding: 12,
+    },
+    shareText: {
+        color: Colors.primary,
         fontWeight: '600',
     },
-    itemSub: {
-        marginTop: 2,
+    proUpgradeCard: {
+        width: '100%',
+        marginBottom: 32,
     },
-    footer: {
-        paddingHorizontal: 25,
-        marginTop: 20,
+    proUpgradeInner: {
+        padding: 20,
+        backgroundColor: 'rgba(212, 175, 55, 0.08)',
+        borderColor: Colors.primary,
+        borderWidth: 1,
     },
-    footerNote: {
-        textAlign: 'center',
-        marginTop: 10,
-        opacity: 0.6,
-    }
+    proHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
+    },
+    proTitle: {
+        color: Colors.primary,
+        fontWeight: '800',
+        fontSize: 18,
+    },
+    proDescription: {
+        opacity: 0.8,
+        marginBottom: 16,
+        lineHeight: 18,
+    },
+    proButton: {
+        flexDirection: 'row',
+        backgroundColor: Colors.primary,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+    },
+    proButtonText: {
+        color: '#000',
+        fontWeight: '700',
+        fontSize: 14,
+    },
 });
