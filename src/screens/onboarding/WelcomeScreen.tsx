@@ -21,21 +21,21 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                     <View style={styles.circle} />
                 </View>
 
-                <MysticalText variant="h1" style={styles.title}>
-                    Discover what the {'\n'}
-                    <MysticalText variant="h1" color={Colors.secondary}>numbers</MysticalText> say about {'\n'}
-                    your destiny.
-                </MysticalText>
+                <View style={styles.titleRow}>
+                    <MysticalText variant="h1" style={styles.title}>{t('discoverTitle')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.titleAccent}>{t('discoverTitleAccent')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.title}>{t('discoverTitleEnd')}</MysticalText>
+                </View>
 
                 <MysticalText variant="subtitle" style={styles.subtitle}>
-                    Unlock your cosmic blueprint with AI-powered numerology analysis.
+                    {t('discoverSubtitle')}
                 </MysticalText>
             </View>
 
             <View style={styles.footer}>
-                <Button title="Start Your Journey" onPress={onStart} />
+                <Button title={t('startYourJourney')} onPress={onStart} />
                 <MysticalText variant="caption" style={styles.poweredBy}>
-                    POWERED BY ADVANCED AI
+                    {t('poweredBy')}
                 </MysticalText>
                 <MysticalText variant="caption" style={styles.disclaimer}>
                     {t('disclaimer')}
@@ -70,9 +70,18 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(212, 175, 55, 0.2)',
         opacity: 0.5,
     },
+    titleRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
     title: {
         textAlign: 'center',
-        marginBottom: 20,
+    },
+    titleAccent: {
+        color: Colors.secondary,
+        textAlign: 'center',
     },
     subtitle: {
         textAlign: 'center',

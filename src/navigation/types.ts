@@ -9,6 +9,7 @@ export type RootStackParamList = {
     Birthdate: undefined;
     Calculating: undefined;
     BirthTime: undefined;
+    EnterBirthTime: undefined;
     Relationship: undefined;
     Focus: undefined;
     Challenge: undefined;
@@ -33,9 +34,11 @@ export type RootStackParamList = {
         personalYear: number | string;
         dailyNumber: number | string;
     };
+    ConnectionReading: { connectionId: string };
 };
 
 export type MainTabParamList = {
+    Vault: undefined;
     Home: {
         name: string;
         reading: string;

@@ -5,7 +5,7 @@ import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { Star, User, Calendar, Target, Camera, CreditCard, Settings, Shield, Trash2 } from 'lucide-react-native';
+import { Star, User, Calendar, Target, Camera, CreditCard, Globe, Shield, Trash2 } from 'lucide-react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, MainTabParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,7 +24,7 @@ type Props = CompositeScreenProps<
 >;
 
 export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
-    const { language, t } = useSettings();
+    const { language, t, isRTL } = useSettings();
     const { clearUserData, userProfile, numerologyResults } = useUser();
 
     // Use context (persistent) data as primary, route.params as fallback
@@ -70,7 +70,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            Alert.alert('Permission needed', 'We need access to your gallery to upload a profile picture.');
+            Alert.alert(t('permissionNeeded'), t('galleryAccess'));
             return;
         }
 
@@ -88,12 +88,12 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            t('deleteAccount') || 'Delete Account',
-            t('deleteConfirm') || 'Are you sure you want to delete your account? This action cannot be undone.',
+            t('deleteAccount'),
+            t('deleteConfirm'),
             [
-                { text: t('cancel') || 'Cancel', style: 'cancel' },
+                { text: t('cancel'), style: 'cancel' },
                 {
-                    text: t('delete') || 'Delete',
+                    text: t('delete'),
                     style: 'destructive',
                     onPress: async () => {
                         touchDebug("ProfileDeleteAccountConfirmed");
@@ -108,7 +108,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
         <GradientBackground style={styles.container}>
             <SafeAreaView style={styles.safe}>
                 <ScrollView
-                    contentContainerStyle={styles.scroll}
+                    contentContainerStyle={[styles.scroll, isRTL && styles.scrollRTL]}
                     keyboardShouldPersistTaps="handled"
                     delaysContentTouches={false}
                 >
@@ -130,7 +130,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <Camera color="#000" size={12} />
                             </View>
                         </TouchableOpacity>
-                        <MysticalText variant="h2" style={styles.name}>{name || 'Seeker'}</MysticalText>
+                        <MysticalText variant="h2" style={styles.name}>{name || t('seeker')}</MysticalText>
 
                         {isPro ? (
                             <TouchableOpacity style={styles.premiumLabel} onPress={presentCustomerCenter}>
@@ -159,13 +159,13 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         <TouchableOpacity
                             style={styles.settingsButton}
                             onPress={() => navigation.navigate('Settings')}
-                            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                            <Settings color={Colors.textSecondary} size={20} />
-                            <MysticalText style={styles.settingsText}>{t('settings')}</MysticalText>
+                            <Globe color={Colors.textSecondary} size={20} />
+                            <MysticalText style={styles.settingsText}>{t('language')}</MysticalText>
                         </TouchableOpacity>
 
-                        <DetailItem icon={User} label={t('language')} value={language || 'English'} />
+                        <DetailItem icon={User} label={t('language')} value={language === 'Hebrew' ? t('hebrewLanguage') : t('englishLanguage')} />
                         <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
                         <DetailItem icon={Target} label={t('dailyFocus')} value={`${t('vibration')} ${dailyNumber || 0}`} />
 
@@ -186,7 +186,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
                         <TouchableOpacity
                             style={styles.settingsButton}
-                            onPress={() => Alert.alert(t('privacyPolicy'), 'Privacy policy link placeholder.')}
+                            onPress={() => Alert.alert(t('privacyPolicy'), t('privacyPolicyMessage'))}
                         >
                             <Shield color={Colors.textSecondary} size={20} />
                             <MysticalText style={styles.settingsText}>{t('privacyPolicy')}</MysticalText>
@@ -197,7 +197,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                             onPress={handleDeleteAccount}
                         >
                             <Trash2 color="#FF453A" size={20} />
-                            <MysticalText style={[styles.settingsText, styles.deleteText]}>{t('deleteAccount') || 'Delete Account'}</MysticalText>
+                            <MysticalText style={[styles.settingsText, styles.deleteText]}>{t('deleteAccount')}</MysticalText>
                         </TouchableOpacity>
                     </View>
 
@@ -244,6 +244,7 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     safe: { flex: 1 },
     scroll: { padding: 25 },
+    scrollRTL: { direction: 'rtl' },
     header: { alignItems: 'center', marginBottom: 20 },
     avatarBorder: {
         width: 100,

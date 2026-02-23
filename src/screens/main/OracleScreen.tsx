@@ -49,6 +49,12 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     const [cooldown, setCooldown] = useState(false);
 
     useEffect(() => {
+        setMessages(prev => prev.map((m, i) =>
+            i === 0 && m.sender === 'oracle' ? { ...m, text: t('oracleGreeting') } : m
+        ));
+    }, [language, t]);
+
+    useEffect(() => {
         loadHistory();
     }, []);
 
@@ -108,7 +114,15 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
         }, 500);
 
         try {
-            const response = await AIService.generateOracleResponse(text, lifePath, language);
+            const personalization = (userProfile?.identity || userProfile?.focus || userProfile?.challenge || userProfile?.relationshipStatus)
+                ? {
+                    identity: userProfile?.identity,
+                    focus: userProfile?.focus,
+                    challenge: userProfile?.challenge,
+                    relationshipStatus: userProfile?.relationshipStatus,
+                }
+                : undefined;
+            const response = await AIService.generateOracleResponse(text, lifePath, language, personalization);
             const oracleMsg: Message = { id: (Date.now() + 1).toString(), text: response, sender: 'oracle' };
             setMessages(prev => [...prev, oracleMsg]);
             saveToHistory(text, response);
@@ -245,14 +259,14 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                     <View style={styles.modalOverlay}>
                         <GlassCard style={styles.historyModal}>
                             <View style={styles.modalHeader}>
-                                <MysticalText variant="subtitle" style={styles.modalTitle}>{t('recentQuestions') || 'Recent Questions'}</MysticalText>
+                                <MysticalText variant="subtitle" style={styles.modalTitle}>{t('recentQuestions')}</MysticalText>
                                 <TouchableOpacity onPress={() => setShowHistory(false)}>
                                     <X color={Colors.textSecondary} size={24} />
                                 </TouchableOpacity>
                             </View>
 
                             {history.length === 0 ? (
-                                <MysticalText style={styles.emptyHistory}>{t('noHistory') || 'The mists of time are clear...'}</MysticalText>
+                                <MysticalText style={styles.emptyHistory}>{t('noHistory')}</MysticalText>
                             ) : (
                                 <FlatList
                                     data={history}

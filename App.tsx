@@ -12,6 +12,7 @@ import { IdentityScreen } from './src/screens/onboarding/IdentityScreen';
 import { NameScreen } from './src/screens/onboarding/NameScreen';
 import { BirthdateScreen } from './src/screens/onboarding/BirthdateScreen';
 import { BirthTimeScreen } from './src/screens/onboarding/BirthTimeScreen';
+import { EnterBirthTimeScreen } from './src/screens/onboarding/EnterBirthTimeScreen';
 import { RelationshipScreen } from './src/screens/onboarding/RelationshipScreen';
 import { FocusScreen } from './src/screens/onboarding/FocusScreen';
 import { ChallengeScreen } from './src/screens/onboarding/ChallengeScreen';
@@ -22,12 +23,16 @@ import { HomeScreen } from './src/screens/main/HomeScreen';
 import { OracleScreen } from './src/screens/main/OracleScreen';
 import { MatchScreen } from './src/screens/main/MatchScreen';
 import { ProfileScreen } from './src/screens/main/ProfileScreen';
+import { VaultScreen } from './src/screens/main/VaultScreen';
+import { ConnectionReadingScreen } from './src/screens/main/ConnectionReadingScreen';
 import { PaywallScreen } from './src/screens/main/PaywallScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
-import { Home, Sparkles, Heart, User } from 'lucide-react-native';
+import { Home, Sparkles, Heart, User, Lock } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
+import { VaultProvider } from './src/context/VaultContext';
 import { useRevenueCat } from './src/context/RevenueCatContext';
+import { useSettings } from './src/context/SettingsContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { SettingsScreen } from './src/screens/settings/SettingsScreen';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,24 +44,38 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 function MainTabNavigator({ route }: any) {
   const results = route.params || {};
   const insets = useSafeAreaInsets();
+  const { language, t, isRTL } = useSettings();
+
+  const tabLabel = (name: string) => {
+    if (name === 'Home') return t('tabHome');
+    if (name === 'Oracle') return t('tabOracle');
+    if (name === 'Match') return t('tabMatch');
+    if (name === 'Vault') return t('tabVault');
+    if (name === 'Profile') return t('tabProfile');
+    return name;
+  };
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      key={language}
+      screenOptions={({ route: r }) => ({
         headerShown: false,
+        tabBarLabel: tabLabel(r.name),
         tabBarStyle: {
           backgroundColor: '#0a0612',
           borderTopColor: 'rgba(255,255,255,0.05)',
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom,
+          ...(isRTL ? { direction: 'rtl' } : {}),
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarIcon: ({ color, size }) => {
           let icon;
-          if (route.name === 'Home') icon = <Home color={color} size={size} />;
-          else if (route.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
-          else if (route.name === 'Match') icon = <Heart color={color} size={size} />;
+          if (r.name === 'Home') icon = <Home color={color} size={size} />;
+          else if (r.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
+          else if (r.name === 'Match') icon = <Heart color={color} size={size} />;
+          else if (r.name === 'Vault') icon = <Lock color={color} size={size} />;
           else icon = <User color={color} size={size} />;
           return <View pointerEvents="none">{icon}</View>;
         },
@@ -77,6 +96,7 @@ function MainTabNavigator({ route }: any) {
         component={MatchScreen}
         initialParams={{ lifePath: results.lifePath, language: results.language }}
       />
+      <Tab.Screen name="Vault" component={VaultScreen} />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
@@ -153,7 +173,21 @@ const AppContent = (props: { navigationRef: any }) => {
   const BirthTimeComponent = useMemo(() => (props: any) => (
     <BirthTimeScreen
       onContinue={(knowsTime: any) => {
-        setUserData((prev: any) => ({ ...prev, knowsBirthTime: knowsTime }));
+        if (knowsTime) {
+          props.navigation.navigate('EnterBirthTime');
+        } else {
+          setUserData((prev: any) => ({ ...prev, knowsBirthTime: false }));
+          props.navigation.navigate('Relationship');
+        }
+      }}
+    />
+  ), []);
+
+  const EnterBirthTimeComponent = useMemo(() => (props: any) => (
+    <EnterBirthTimeScreen
+      onBack={() => props.navigation.goBack()}
+      onContinue={(timeString: string) => {
+        setUserData((prev: any) => ({ ...prev, knowsBirthTime: true, birthTime: timeString }));
         props.navigation.navigate('Relationship');
       }}
     />
@@ -237,6 +271,7 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="Identity" component={IdentityComponent} />
         <Stack.Screen name="Name" component={NameComponent} />
         <Stack.Screen name="BirthTime" component={BirthTimeComponent} />
+        <Stack.Screen name="EnterBirthTime" component={EnterBirthTimeComponent} />
         <Stack.Screen name="Relationship" component={RelationshipComponent} />
         <Stack.Screen name="Focus" component={FocusComponent} />
         <Stack.Screen name="Challenge" component={ChallengeComponent} />
@@ -244,6 +279,7 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="Birthdate" component={BirthdateComponent} />
         <Stack.Screen name="Calculating" component={CalculatingScreenWrapper} />
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
+        <Stack.Screen name="ConnectionReading" component={ConnectionReadingScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen
@@ -258,16 +294,9 @@ const AppContent = (props: { navigationRef: any }) => {
 
 
 import * as Notifications from 'expo-notifications';
+import { configureNotificationHandler } from './src/utils/notifications';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+configureNotificationHandler();
 
 export default function App() {
   const navigationRef = React.useRef<any>(null);
@@ -292,9 +321,11 @@ export default function App() {
       <SafeAreaProvider>
         <RevenueCatProvider>
           <UserProvider>
-            <SettingsProvider>
-              <AppContent navigationRef={navigationRef} />
-            </SettingsProvider>
+            <VaultProvider>
+              <SettingsProvider>
+                <AppContent navigationRef={navigationRef} />
+              </SettingsProvider>
+            </VaultProvider>
           </UserProvider>
         </RevenueCatProvider>
       </SafeAreaProvider>

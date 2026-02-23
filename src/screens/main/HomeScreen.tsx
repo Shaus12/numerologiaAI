@@ -7,12 +7,15 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { MainTabParamList } from '../../navigation/types';
-import { Sparkles, ChevronRight } from 'lucide-react-native';
+import { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import { Sparkles, ChevronRight, BookOpen } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
 import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useUser } from '../../context/UserContext';
+import { useRevenueCat } from '../../context/RevenueCatContext';
+import { localeForLanguage } from '../../utils/translations';
+import { requestNotificationPermissions, scheduleDailyMorningReminder } from '../../utils/notifications';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
     route: { params?: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
@@ -21,6 +24,25 @@ type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
 export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const { language, t } = useSettings();
     const { userProfile, numerologyResults } = useUser();
+    const { isPro } = useRevenueCat();
+
+    const hasStoredReading = Boolean(numerologyResults?.reading?.trim());
+
+    const onAnalysisCardPress = () => {
+        if (!hasStoredReading) return;
+        const parent = navigation.getParent();
+        const params: RootStackParamList['AnalysisComplete'] = {
+            reading: numerologyResults!.reading!,
+            lifePath: numerologyResults!.lifePath ?? 0,
+            destiny: numerologyResults!.destiny ?? 0,
+            soulUrge: numerologyResults!.soulUrge ?? 0,
+            personality: numerologyResults!.personality ?? 0,
+            language: userProfile?.language ?? language,
+            personalYear: numerologyResults!.personalYear ?? 0,
+            dailyNumber: numerologyResults!.dailyNumber ?? 0,
+        };
+        (parent as any)?.navigate('AnalysisComplete', params);
+    };
 
     // Use context (persistent) data as primary, route.params as fallback for fresh navigation
     const name = userProfile?.name ?? route.params?.name ?? t('seeker');
@@ -42,6 +64,21 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         }
     }, [route.params?.openDailyInsight]);
 
+    // Request notification permission and schedule daily morning reminder after user is on Home (past splash/onboarding)
+    React.useEffect(() => {
+        const timer = setTimeout(async () => {
+            try {
+                const granted = await requestNotificationPermissions();
+                if (granted) {
+                    await scheduleDailyMorningReminder();
+                }
+            } catch (e) {
+                // Ignore; permission or scheduling can fail on simulators or if user denies
+            }
+        }, 1800);
+        return () => clearTimeout(timer);
+    }, []);
+
     React.useEffect(() => {
         const fetchInsight = async () => {
             const todayKey = new Date().toISOString().split('T')[0];
@@ -57,7 +94,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                 }
 
                 // If not cached, fetch from AI
-                const insight = await AIService.getDailyInsight(lifePath, language);
+                const insight = await AIService.getDailyInsight(lifePath, language, userProfile?.identity ? { identity: userProfile.identity } : undefined);
                 if (insight) {
                     setDailyInsight(insight);
                     await AsyncStorage.setItem(cacheKey, insight);
@@ -72,7 +109,8 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     }, [lifePath, language]);
 
     const today = new Date();
-    const formattedDate = today.toLocaleDateString('en-US', {
+    const locale = localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US';
+    const formattedDate = today.toLocaleDateString(locale, {
         weekday: 'long',
         month: 'long',
         day: 'numeric'
@@ -94,7 +132,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
 
                     {/* Header Section */}
                     <View style={styles.header}>
-                        <MysticalText style={styles.welcomeText}>Welcome back!</MysticalText>
+                        <MysticalText style={styles.welcomeText}>{t('welcomeBack')}</MysticalText>
                         <MysticalText variant="h1" style={styles.nameText}>{name || t('seeker')}</MysticalText>
                         <MysticalText style={styles.dateText}>{formattedDate}</MysticalText>
                     </View>
@@ -109,6 +147,29 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                             {loadingInsight ? t('consultingStars') : dailyInsight}
                         </MysticalText>
                     </GlassCard>
+
+                    {/* View full analysis – show for anyone with stored reading; Pro opens analysis, non-Pro opens paywall */}
+                    {hasStoredReading && (
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={onAnalysisCardPress}
+                            style={styles.viewAnalysisWrap}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <GlassCard style={styles.viewAnalysisCard}>
+                                <View style={styles.oracleIconBox}>
+                                    <BookOpen color={Colors.primary} size={24} />
+                                </View>
+                                <View style={styles.oracleTextContent}>
+                                    <MysticalText variant="subtitle" style={styles.oracleTitle}>{t('viewFullAnalysis')}</MysticalText>
+                                    <MysticalText variant="caption" style={styles.oracleSub}>
+                                        {isPro ? t('viewFullAnalysisSub') : t('unlockFullAnalysis')}
+                                    </MysticalText>
+                                </View>
+                                <ChevronRight color={Colors.textSecondary} size={20} />
+                            </GlassCard>
+                        </TouchableOpacity>
+                    )}
 
                     {/* YOUR NUMBERS Section */}
                     <View style={styles.section}>
@@ -291,6 +352,17 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         fontStyle: 'italic',
         opacity: 0.9,
+    },
+    viewAnalysisWrap: {
+        marginBottom: 20,
+    },
+    viewAnalysisCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 15,
+        gap: 15,
+        borderLeftWidth: 4,
+        borderLeftColor: Colors.primary,
     },
     section: { marginBottom: 25 },
     sectionTitle: {

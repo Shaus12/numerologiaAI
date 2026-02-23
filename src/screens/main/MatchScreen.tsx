@@ -11,6 +11,7 @@ import { Heart, Sparkles, ArrowLeft, Lock } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
 import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
+import { localeForLanguage } from '../../utils/translations';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
@@ -78,7 +79,10 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
         );
 
         try {
-            const result = await AIService.calculateCompatibility(lifePath, partnerDate.toISOString(), language);
+            const personalization = (userProfile?.identity || userProfile?.relationshipStatus)
+                ? { identity: userProfile?.identity, relationshipStatus: userProfile?.relationshipStatus }
+                : undefined;
+            const result = await AIService.calculateCompatibility(lifePath, partnerDate.toISOString(), language, personalization);
             setAnalysis(result);
             // Stay in scanning for a bit for effect
             setTimeout(() => {
@@ -108,7 +112,7 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
                                 onPress={() => setShowPicker(!showPicker)}
                             >
                                 <MysticalText variant="h2" color="#ffffff">
-                                    {partnerDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    {partnerDate.toLocaleDateString(localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                 </MysticalText>
                             </TouchableOpacity>
 

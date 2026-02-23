@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Globe } from 'lucide-react-native';
+import { useSettings } from '../../context/SettingsContext';
 
 interface Language {
     id: string;
@@ -14,10 +15,12 @@ interface Language {
 }
 
 const LANGUAGES: Language[] = [
-    { id: 'en', name: 'English', flag: '🇺🇸' },
-    { id: 'es', name: 'Spanish', flag: '🇪🇸' },
-    { id: 'fr', name: 'French', flag: '🇫🇷' },
-    { id: 'de', name: 'German', flag: '🇩🇪' },
+    { id: 'English', name: 'English', flag: '🇺🇸' },
+    { id: 'Hebrew', name: 'עברית', flag: '🇮🇱' },
+    { id: 'Spanish', name: 'Español', flag: '🇪🇸' },
+    { id: 'Portuguese', name: 'Português', flag: '🇧🇷' },
+    { id: 'French', name: 'Français', flag: '🇫🇷' },
+    { id: 'German', name: 'Deutsch', flag: '🇩🇪' },
 ];
 
 interface LanguageScreenProps {
@@ -27,7 +30,13 @@ interface LanguageScreenProps {
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) => {
-    const [selected, setSelected] = useState('en');
+    const { t, setLanguage } = useSettings();
+    const [selected, setSelected] = useState('English');
+
+    const handleContinue = async () => {
+        await setLanguage(selected as any);
+        onContinue(selected);
+    };
 
     return (
         <GradientBackground style={styles.container}>
@@ -36,12 +45,12 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
                 <View style={styles.iconContainer}>
                     <Globe color={Colors.primary} size={40} />
                 </View>
-                <MysticalText variant="h1" style={styles.title}>
-                    Choose your {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>language</MysticalText>
-                </MysticalText>
+                <View style={styles.titleRow}>
+                    <MysticalText variant="h1" style={styles.title}>{t('chooseYour')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.titleAccent}>{t('languageWord')}</MysticalText>
+                </View>
                 <MysticalText variant="subtitle" style={styles.subtitle}>
-                    Select your preferred language for a personalized experience.
+                    {t('languageSubtitle')}
                 </MysticalText>
             </View>
 
@@ -74,7 +83,7 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
             </ScrollView>
 
             <View style={styles.footer}>
-                <Button title="Continue" onPress={() => onContinue(selected)} />
+                <Button title={t('continue')} onPress={handleContinue} />
             </View>
         </GradientBackground>
     );
@@ -99,9 +108,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 20,
     },
+    titleRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
     title: {
         textAlign: 'center',
-        marginBottom: 10,
+    },
+    titleAccent: {
+        color: Colors.primary,
+        textAlign: 'center',
     },
     subtitle: {
         textAlign: 'center',

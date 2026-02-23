@@ -7,6 +7,8 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { ChevronLeft, Calendar } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useSettings } from '../../context/SettingsContext';
+import { localeForLanguage } from '../../utils/translations';
 
 interface BirthdateScreenProps {
     onContinue: (date: Date) => void;
@@ -16,6 +18,7 @@ interface BirthdateScreenProps {
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, onBack }) => {
+    const { t, language } = useSettings();
     const [date, setDate] = useState(new Date(1990, 0, 1));
     const [show, setShow] = useState(true);
 
@@ -30,11 +33,11 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
 
             <View style={styles.header}>
                 <MysticalText variant="h1" style={styles.title}>
-                    When were you {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>born?</MysticalText>
+                    {t('birthdateTitleLine1')} {'\n'}
+                    <MysticalText variant="h1" color={Colors.primary}>{t('birthdateTitleLine2')}</MysticalText>
                 </MysticalText>
                 <MysticalText variant="subtitle" style={styles.subtitle}>
-                    Your date of birth reveals your Life Path and inner character.
+                    {t('birthdateSubtitle')}
                 </MysticalText>
             </View>
 
@@ -42,7 +45,7 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
                 <GlassCard style={styles.dateDisplay}>
                     <Calendar color={Colors.primary} size={32} style={styles.calendarIcon} />
                     <MysticalText variant="h2" style={styles.dateText}>
-                        {date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {date.toLocaleDateString(localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                     </MysticalText>
                 </GlassCard>
 
@@ -59,7 +62,7 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
             </View>
 
             <View style={styles.footer}>
-                <Button title="Continue" onPress={() => onContinue(date)} />
+                <Button title={t('continue')} onPress={() => onContinue(date)} />
             </View>
         </GradientBackground>
     );

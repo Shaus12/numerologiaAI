@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Colors } from '../../constants/Colors';
 import { MysticalText } from '../ui/MysticalText';
+import { useSettings } from '../../context/SettingsContext';
 
 interface OnboardingHeaderProps {
     step: number;
@@ -10,13 +11,14 @@ interface OnboardingHeaderProps {
 }
 
 export const OnboardingHeader: React.FC<OnboardingHeaderProps> = ({ step, totalSteps }) => {
+    const { t } = useSettings();
     const progress = (step / totalSteps) * 100;
 
     return (
         <View style={styles.container}>
             <View style={styles.topRow}>
                 <MysticalText variant="caption" style={styles.stepText}>
-                    STEP {step} OF {totalSteps}
+                    {t('stepLabel')} {step} {t('ofLabel')} {totalSteps}
                 </MysticalText>
                 <MysticalText variant="caption" style={styles.progressText}>
                     {Math.round(progress)}%

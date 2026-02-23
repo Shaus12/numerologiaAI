@@ -7,20 +7,22 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Heart, User, Users, Star, HelpCircle } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface RelationshipScreenProps {
     onContinue: (status: string) => void;
 }
 
 const STATUSES = [
-    { id: 'single', label: 'Single', sub: 'Open to finding love', icon: Heart },
-    { id: 'relationship', label: 'In a Relationship', sub: 'Dating or committed', icon: Users },
-    { id: 'married', label: 'Married', sub: 'Legally or spiritually united', icon: Star },
-    { id: 'complicated', label: 'It\'s Complicated', sub: 'Navigating complex dynamics', icon: HelpCircle },
-    { id: 'private', label: 'Prefer not to say', sub: 'Keep this private', icon: User },
+    { id: 'single', labelKey: 'statusSingle' as const, subKey: 'statusSingleSub' as const, icon: Heart },
+    { id: 'relationship', labelKey: 'statusRelationship' as const, subKey: 'statusRelationshipSub' as const, icon: Users },
+    { id: 'married', labelKey: 'statusMarried' as const, subKey: 'statusMarriedSub' as const, icon: Star },
+    { id: 'complicated', labelKey: 'statusComplicated' as const, subKey: 'statusComplicatedSub' as const, icon: HelpCircle },
+    { id: 'private', labelKey: 'statusPrivate' as const, subKey: 'statusPrivateSub' as const, icon: User },
 ];
 
 export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContinue }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState<string | null>(null);
 
     return (
@@ -35,12 +37,12 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
                 delaysContentTouches={false}
             >
                 <MysticalText variant="h1" style={styles.title}>
-                    What is your {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>relationship status?</MysticalText>
+                    {t('relationshipTitleLine1')} {'\n'}
+                    <MysticalText variant="h1" color={Colors.primary}>{t('relationshipTitleLine2')}</MysticalText>
                 </MysticalText>
 
                 <MysticalText style={styles.subtitle}>
-                    Understanding your love life helps us provide better compatibility insights.
+                    {t('relationshipSubtitle')}
                 </MysticalText>
 
                 <View style={styles.options}>
@@ -51,8 +53,8 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
                                     <item.icon color={selected === item.id ? Colors.primary : Colors.textSecondary} size={24} />
                                 </View>
                                 <View style={styles.optionText}>
-                                    <MysticalText variant="body" style={styles.optionTitle}>{item.label}</MysticalText>
-                                    <MysticalText variant="caption" style={styles.optionSub}>{item.sub}</MysticalText>
+                                    <MysticalText variant="body" style={styles.optionTitle}>{t(item.labelKey)}</MysticalText>
+                                    <MysticalText variant="caption" style={styles.optionSub}>{t(item.subKey)}</MysticalText>
                                 </View>
                                 {selected === item.id && (
                                     <View style={styles.checkCircle}>
@@ -67,7 +69,7 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
 
             <View style={styles.footer}>
                 <Button
-                    title="Continue"
+                    title={t('continue')}
                     onPress={() => onContinue(selected!)}
                     disabled={selected === null}
                 />

@@ -18,11 +18,16 @@ export const SettingsScreen = () => {
         <GradientBackground>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <ArrowLeft color="#fff" size={24} />
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backBtn}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 32, bottom: 32, left: 32, right: 32 }}
+                    >
+                        <ArrowLeft color="#fff" size={26} />
                     </TouchableOpacity>
-                    <MysticalText variant="h2">{t('settingsTitle')}</MysticalText>
-                    <View style={{ width: 40 }} />
+                    <MysticalText variant="h2" style={styles.headerTitle}>{t('languageTitle')}</MysticalText>
+                    <View style={styles.headerSpacer} />
                 </View>
 
                 <ScrollView
@@ -62,11 +67,23 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 12,
         marginBottom: 30,
     },
     backBtn: {
-        padding: 8,
+        padding: 20,
+        minWidth: 64,
+        minHeight: 64,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 4,
+    },
+    headerTitle: {
+        flex: 1,
+        textAlign: 'center',
+    },
+    headerSpacer: {
+        width: 64,
     },
     content: {
         paddingHorizontal: 20,

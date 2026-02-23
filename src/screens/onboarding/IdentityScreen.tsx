@@ -6,19 +6,13 @@ import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { User, UserPlus, Users, EyeOff, ChevronLeft } from 'lucide-react-native';
+import { useSettings } from '../../context/SettingsContext';
 
 interface IdentityOption {
     id: string;
     label: string;
     icon: React.ElementType;
 }
-
-const OPTIONS: IdentityOption[] = [
-    { id: 'male', label: 'Male', icon: User },
-    { id: 'female', label: 'Female', icon: UserPlus },
-    { id: 'non-binary', label: 'Non-binary', icon: Users },
-    { id: 'private', label: 'Prefer not to say', icon: EyeOff },
-];
 
 interface IdentityScreenProps {
     onContinue: (identity: string) => void;
@@ -28,7 +22,15 @@ interface IdentityScreenProps {
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBack }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState('private');
+
+    const options: IdentityOption[] = [
+        { id: 'male', label: t('male'), icon: User },
+        { id: 'female', label: t('female'), icon: UserPlus },
+        { id: 'non-binary', label: t('nonBinary'), icon: Users },
+        { id: 'private', label: t('preferNotToSay'), icon: EyeOff },
+    ];
 
     return (
         <GradientBackground style={styles.container}>
@@ -41,17 +43,17 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
                 delaysContentTouches={false}
             >
                 <View style={styles.header}>
-                    <MysticalText variant="h1" style={styles.title}>
-                        How do you {'\n'}
-                        <MysticalText variant="h1" color={Colors.primary}>identify?</MysticalText>
-                    </MysticalText>
+                    <View style={styles.titleRow}>
+                        <MysticalText variant="h1" style={styles.title}>{t('identityTitle')}</MysticalText>
+                        <MysticalText variant="h1" style={styles.titleAccent}>{t('identityTitleAccent')}</MysticalText>
+                    </View>
                     <MysticalText variant="subtitle" style={styles.subtitle}>
-                        This helps us personalize your numerology readings
+                        {t('identitySubtitle')}
                     </MysticalText>
                 </View>
 
                 <View style={styles.optionsGrid}>
-                    {OPTIONS.map((item) => {
+                    {options.map((item) => {
                         const Icon = item.icon;
                         return (
                             <TouchableOpacity
@@ -81,7 +83,7 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
             </ScrollView>
 
             <View style={styles.footer}>
-                <Button title="Continue" onPress={() => onContinue(selected)} />
+                <Button title={t('continue')} onPress={() => onContinue(selected)} />
             </View>
         </GradientBackground>
     );
@@ -126,12 +128,24 @@ const styles = StyleSheet.create({
     header: {
         marginBottom: 40,
     },
-    title: {
+    titleRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
         marginBottom: 10,
+    },
+    title: {
         fontSize: 28,
+        textAlign: 'center',
+    },
+    titleAccent: {
+        color: Colors.primary,
+        fontSize: 28,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: 14,
+        textAlign: 'center',
     },
     scroll: {
         flex: 1,

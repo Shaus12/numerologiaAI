@@ -6,6 +6,7 @@ import { Colors } from '../../constants/Colors';
 import { NumerologyEngine } from '../../utils/numerology';
 import { AIService } from '../../services/ai';
 import { useUser } from '../../context/UserContext';
+import { useSettings } from '../../context/SettingsContext';
 
 interface CalculatingScreenProps {
     userData: {
@@ -17,15 +18,10 @@ interface CalculatingScreenProps {
     onFinish: (results: any) => void;
 }
 
-const STEPS = [
-    'Aligning planetary energies...',
-    'Decoding your Life Path...',
-    'Extracting Soul Urge...',
-    'Consulting the Oracle...',
-    'Finalizing your blueprint...'
-];
+const STEP_KEYS = ['calcStep1', 'calcStep2', 'calcStep3', 'calcStep4', 'calcStep5'] as const;
 
 export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, onFinish }) => {
+    const { t } = useSettings();
     const [stepIndex, setStepIndex] = useState(0);
     const [spinValue] = useState(new Animated.Value(0));
     const { saveUserProfile, saveNumerologyResults } = useUser();
@@ -43,7 +39,7 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
 
         // Step progression
         const interval = setInterval(() => {
-            setStepIndex((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
+            setStepIndex((prev) => (prev < STEP_KEYS.length - 1 ? prev + 1 : prev));
         }, 1500);
 
         // Parallel calculations and AI generation
@@ -71,7 +67,11 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
                         destiny,
                         soulUrge,
                         personality,
-                        language: userData.language || 'English'
+                        language: userData.language || 'English',
+                        identity: userData.identity,
+                        focus: userData.focus,
+                        challenge: userData.challenge,
+                        relationshipStatus: userData.relationshipStatus,
                     });
                 } catch (aiError) {
                     console.error('AI Reading Error:', aiError);
@@ -139,10 +139,10 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
                 </Animated.View>
 
                 <MysticalText variant="h2" style={styles.title}>
-                    Calculating...
+                    {t('calculatingTitle')}
                 </MysticalText>
                 <MysticalText variant="body" style={styles.stepText}>
-                    {STEPS[stepIndex]}
+                    {t(STEP_KEYS[stepIndex])}
                 </MysticalText>
             </View>
         </GradientBackground>

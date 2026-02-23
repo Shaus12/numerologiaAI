@@ -5,6 +5,7 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { Colors } from '../../constants/Colors';
 import { ChevronLeft } from 'lucide-react-native';
+import { useSettings } from '../../context/SettingsContext';
 
 interface NameScreenProps {
     onContinue: (name: string) => void;
@@ -14,6 +15,7 @@ interface NameScreenProps {
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const NameScreen: React.FC<NameScreenProps> = ({ onContinue, onBack }) => {
+    const { t } = useSettings();
     const [name, setName] = useState('');
     const [isFocused, setIsFocused] = useState(false);
 
@@ -27,18 +29,18 @@ export const NameScreen: React.FC<NameScreenProps> = ({ onContinue, onBack }) =>
 
                 <View style={styles.header}>
                     <MysticalText variant="h1" style={styles.title}>
-                        What is your {'\n'}
-                        <MysticalText variant="h1" color={Colors.primary}>full name?</MysticalText>
+                        {t('nameTitleLine1')} {'\n'}
+                        <MysticalText variant="h1" color={Colors.primary}>{t('nameTitleLine2')}</MysticalText>
                     </MysticalText>
                     <MysticalText variant="subtitle" style={styles.subtitle}>
-                        Your name holds the key to your destiny in the Pythagorean system.
+                        {t('nameSubtitle')}
                     </MysticalText>
                 </View>
 
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Enter your full name"
+                        placeholder={t('namePlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.3)"
                         value={name}
                         onChangeText={setName}
@@ -50,7 +52,7 @@ export const NameScreen: React.FC<NameScreenProps> = ({ onContinue, onBack }) =>
 
                 <View style={styles.footer}>
                     <Button
-                        title="Continue"
+                        title={t('continue')}
                         onPress={() => onContinue(name)}
                         disabled={!name.trim()}
                         style={!name.trim() && styles.disabledButton}

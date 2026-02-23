@@ -7,19 +7,21 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Briefcase, Heart, Sparkles, Activity } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface FocusScreenProps {
     onContinue: (focus: string) => void;
 }
 
 const FOCI = [
-    { id: 'career', label: 'Career & Money', sub: 'Focus on professional growth and financial stability', icon: Briefcase },
-    { id: 'love', label: 'Love & Relationships', sub: 'Focus on finding or nurturing deep connections', icon: Heart },
-    { id: 'spiritual', label: 'Spiritual Growth', sub: 'Focus on inner peace, mindfulness, and purpose', icon: Sparkles },
-    { id: 'health', label: 'Health', sub: 'Focus on physical well-being and vital energy', icon: Activity },
+    { id: 'career', labelKey: 'focusCareer' as const, subKey: 'focusCareerSub' as const, icon: Briefcase },
+    { id: 'love', labelKey: 'focusLove' as const, subKey: 'focusLoveSub' as const, icon: Heart },
+    { id: 'spiritual', labelKey: 'focusSpiritual' as const, subKey: 'focusSpiritualSub' as const, icon: Sparkles },
+    { id: 'health', labelKey: 'focusHealth' as const, subKey: 'focusHealthSub' as const, icon: Activity },
 ];
 
 export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState<string | null>(null);
 
     return (
@@ -34,12 +36,12 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
                 delaysContentTouches={false}
             >
                 <MysticalText variant="h1" style={styles.title}>
-                    What is your {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>main focus</MysticalText> right now?
+                    {t('focusTitleLine1')} {'\n'}
+                    <MysticalText variant="h1" color={Colors.primary}>{t('focusTitleLine2')}</MysticalText> {t('focusTitleLine3')}
                 </MysticalText>
 
                 <MysticalText style={styles.subtitle}>
-                    Select one to personalize your journey.
+                    {t('focusSubtitle')}
                 </MysticalText>
 
                 <View style={styles.options}>
@@ -48,8 +50,8 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
                             <GlassCard style={[styles.option, selected === item.id && styles.optionActive]} border={selected === item.id}>
                                 <View style={styles.optionContent}>
                                     <View style={styles.textPart}>
-                                        <MysticalText variant="body" style={styles.optionTitle}>{item.label}</MysticalText>
-                                        <MysticalText variant="caption" style={styles.optionSub}>{item.sub}</MysticalText>
+                                        <MysticalText variant="body" style={styles.optionTitle}>{t(item.labelKey)}</MysticalText>
+                                        <MysticalText variant="caption" style={styles.optionSub}>{t(item.subKey)}</MysticalText>
                                     </View>
                                     <View style={styles.iconBox}>
                                         <item.icon color={selected === item.id ? Colors.primary : Colors.textSecondary} size={28} />
@@ -61,13 +63,13 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
                 </View>
 
                 <MysticalText variant="caption" style={styles.footerNote}>
-                    You can change your focus anytime in settings.
+                    {t('focusFooterNote')}
                 </MysticalText>
             </ScrollView>
 
             <View style={styles.footer}>
                 <Button
-                    title="Continue"
+                    title={t('continue')}
                     onPress={() => onContinue(selected!)}
                     disabled={selected === null}
                 />

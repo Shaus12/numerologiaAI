@@ -1,3 +1,26 @@
+// English vowels (Pythagorean: used for Soul Urge = vowels, Personality = consonants)
+const ENGLISH_VOWELS = ['A', 'E', 'I', 'O', 'U'];
+
+// Hebrew vowels for Soul Urge / Personality: Aleph, Hey, Vav, Yod (א, ה, ו, י). All other Hebrew letters = consonants.
+const HEBREW_VOWELS = ['א', 'ה', 'ו', 'י'];
+
+// Hebrew Mispar Katan (Reduced Gematria) mapping
+const HEBREW_LETTER_MAP: Record<string, number> = {};
+[
+    ['א', 'י', 'ק'],
+    ['ב', 'כ', 'ך', 'ר'],
+    ['ג', 'ל', 'ש'],
+    ['ד', 'מ', 'ם', 'ת'],
+    ['ה', 'נ', 'ן'],
+    ['ו', 'ס'],
+    ['ז', 'ע'],
+    ['ח', 'פ', 'ף'],
+    ['ט', 'צ', 'ץ'],
+].forEach((letters, i) => {
+    const value = i + 1;
+    letters.forEach((c) => { HEBREW_LETTER_MAP[c] = value; });
+});
+
 export const NumerologyEngine = {
     /**
      * Calculates the Life Path Number (Sum of all digits in birthdate)
@@ -13,8 +36,6 @@ export const NumerologyEngine = {
                 .split('')
                 .reduce((acc, digit) => acc + parseInt(digit), 0);
 
-            // Master numbers (11, 22, 33) are usually kept, but for simplicity we reduce to single digit
-            // or we can handle them. Let's reduce but keep Master numbers.
             if (sum > 9 && sum !== 11 && sum !== 22 && sum !== 33) {
                 return sumDigits(sum);
             }
@@ -26,7 +47,7 @@ export const NumerologyEngine = {
     },
 
     /**
-     * Pythagorean mapping for letters
+     * Pythagorean mapping for English letters (A–Z). Unchanged.
      */
     letterMap: {
         A: 1, J: 1, S: 1,
@@ -41,26 +62,46 @@ export const NumerologyEngine = {
     } as Record<string, number>,
 
     /**
-     * Calculates specific aspect (Destiny, Soul Urge, etc.)
+     * Hebrew Mispar Katan (Reduced Gematria) mapping. Used for Hebrew letters only.
+     */
+    hebrewMap: HEBREW_LETTER_MAP,
+
+    /**
+     * Reduces to a single digit or master number (11, 22, 33).
+     */
+    reduceToDigit: (num: number): number => {
+        if (num <= 9 || num === 11 || num === 22 || num === 33) return num;
+        return NumerologyEngine.reduceToDigit(
+            String(num).split('').reduce((acc, d) => acc + parseInt(d, 10), 0)
+        );
+    },
+
+    /**
+     * Calculates name number (Destiny = all, Soul Urge = vowels, Personality = consonants).
+     * Supports both English (Pythagorean) and Hebrew (Mispar Katan) in the same string.
+     * Ignores any character not in the English or Hebrew alphabet (spaces, numbers, punctuation).
      */
     calculateNameNumber: (name: string, type: 'all' | 'vowels' | 'consonants'): number => {
-        const vowels = ['A', 'E', 'I', 'O', 'U'];
-        const cleanName = name.toUpperCase().replace(/[^A-Z]/g, '');
-
         let sum = 0;
-        for (let char of cleanName) {
-            const isVowel = vowels.includes(char);
+
+        for (const char of name) {
+            const upper = char.toUpperCase();
+            const isEnglish = NumerologyEngine.letterMap[upper] !== undefined;
+            const isHebrew = HEBREW_LETTER_MAP[char] !== undefined;
+
+            if (!isEnglish && !isHebrew) continue;
+
+            const value = isEnglish ? NumerologyEngine.letterMap[upper]! : HEBREW_LETTER_MAP[char]!;
+            const isVowel = isEnglish
+                ? ENGLISH_VOWELS.includes(upper)
+                : HEBREW_VOWELS.includes(char);
+
             if (type === 'all' || (type === 'vowels' && isVowel) || (type === 'consonants' && !isVowel)) {
-                sum += NumerologyEngine.letterMap[char] || 0;
+                sum += value;
             }
         }
 
-        const reduce = (num: number): number => {
-            if (num <= 9 || num === 11 || num === 22 || num === 33) return num;
-            return reduce(String(num).split('').reduce((acc, d) => acc + parseInt(d), 0));
-        };
-
-        return reduce(sum);
+        return NumerologyEngine.reduceToDigit(sum);
     },
 
     calculateDestiny: (name: string) => NumerologyEngine.calculateNameNumber(name, 'all'),

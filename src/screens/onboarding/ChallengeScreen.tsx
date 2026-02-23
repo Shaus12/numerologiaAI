@@ -7,20 +7,22 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Compass, Shield, Zap, TrendingUp, Scale } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface ChallengeScreenProps {
     onContinue: (challenge: string) => void;
 }
 
 const CHALLENGES = [
-    { id: 'purpose', label: 'Finding My Purpose', sub: 'Discovering my true calling in life', icon: Compass },
-    { id: 'relationships', label: 'Improving Relationships', sub: 'Building deeper connections', icon: Zap }, // Using Zap for interactions
-    { id: 'career', label: 'Career Growth', sub: 'Advancing professionally', icon: TrendingUp },
-    { id: 'confidence', label: 'Self-Confidence', sub: 'Believing in myself more', icon: Shield },
-    { id: 'balance', label: 'Life Balance', sub: 'Harmonizing work and personal life', icon: Scale },
+    { id: 'purpose', labelKey: 'challengePurpose' as const, subKey: 'challengePurposeSub' as const, icon: Compass },
+    { id: 'relationships', labelKey: 'challengeRelationships' as const, subKey: 'challengeRelationshipsSub' as const, icon: Zap },
+    { id: 'career', labelKey: 'challengeCareer' as const, subKey: 'challengeCareerSub' as const, icon: TrendingUp },
+    { id: 'confidence', labelKey: 'challengeConfidence' as const, subKey: 'challengeConfidenceSub' as const, icon: Shield },
+    { id: 'balance', labelKey: 'challengeBalance' as const, subKey: 'challengeBalanceSub' as const, icon: Scale },
 ];
 
 export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState<string | null>(null);
 
     return (
@@ -29,12 +31,12 @@ export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) 
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" delaysContentTouches={false}>
                 <MysticalText variant="h1" style={styles.title}>
-                    What is your {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>biggest challenge?</MysticalText>
+                    {t('challengeTitleLine1')} {'\n'}
+                    <MysticalText variant="h1" color={Colors.primary}>{t('challengeTitleLine2')}</MysticalText>
                 </MysticalText>
 
                 <MysticalText style={styles.subtitle}>
-                    We will focus your readings on overcoming this obstacle.
+                    {t('challengeSubtitle')}
                 </MysticalText>
 
                 <View style={styles.options}>
@@ -45,8 +47,8 @@ export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) 
                                     <item.icon color={selected === item.id ? Colors.primary : Colors.textSecondary} size={24} />
                                 </View>
                                 <View style={styles.optionText}>
-                                    <MysticalText variant="body" style={styles.optionTitle}>{item.label}</MysticalText>
-                                    <MysticalText variant="caption" style={styles.optionSub}>{item.sub}</MysticalText>
+                                    <MysticalText variant="body" style={styles.optionTitle}>{t(item.labelKey)}</MysticalText>
+                                    <MysticalText variant="caption" style={styles.optionSub}>{t(item.subKey)}</MysticalText>
                                 </View>
                                 {selected === item.id && (
                                     <View style={styles.checkCircle}>
@@ -61,7 +63,7 @@ export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) 
 
             <View style={styles.footer}>
                 <Button
-                    title="Continue"
+                    title={t('continue')}
                     onPress={() => onContinue(selected!)}
                     disabled={selected === null}
                 />

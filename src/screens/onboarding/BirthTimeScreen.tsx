@@ -7,12 +7,14 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Clock } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface BirthTimeScreenProps {
     onContinue: (knowsTime: boolean) => void;
 }
 
 export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState<boolean | null>(null);
 
     return (
@@ -25,24 +27,24 @@ export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue }) 
                 </View>
 
                 <MysticalText variant="h1" style={styles.title}>
-                    Do you know your {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>birth time?</MysticalText>
+                    {t('birthTimeTitleLine1')} {'\n'}
+                    <MysticalText variant="h1" color={Colors.primary}>{t('birthTimeTitleLine2')}</MysticalText>
                 </MysticalText>
 
                 <MysticalText style={styles.subtitle}>
-                    Your exact birth time unlocks deeper astrological insights.
+                    {t('birthTimeSubtitle')}
                 </MysticalText>
 
                 <View style={styles.options}>
                     <Option
-                        title="Yes, I know it"
-                        sub="I will enter my birth time"
+                        title={t('birthTimeYes')}
+                        sub={t('birthTimeYesSub')}
                         active={selected === true}
                         onPress={() => setSelected(true)}
                     />
                     <Option
-                        title="No, I do not know"
-                        sub="Skip this step"
+                        title={t('birthTimeNo')}
+                        sub={t('birthTimeNoSub')}
                         active={selected === false}
                         onPress={() => setSelected(false)}
                     />
@@ -51,7 +53,7 @@ export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue }) 
 
             <View style={styles.footer}>
                 <Button
-                    title="Continue"
+                    title={t('continue')}
                     onPress={() => onContinue(selected === true)}
                     disabled={selected === null}
                 />

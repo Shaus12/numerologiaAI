@@ -1,16 +1,21 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, BackHandler, Share as RNShare, Alert, InteractionManager } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, BackHandler, Share as RNShare, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { Sparkles, Share2, CheckCircle2, ChevronRight, Lock } from 'lucide-react-native';
+import { Sparkles, Share2, CheckCircle2, Unlock } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useSettings } from '../../context/SettingsContext';
+
+/** ~5 lines at lineHeight 24 (2 more before fade) */
+const TEASER_HEIGHT = 128;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
@@ -19,7 +24,8 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
     const { isPro, presentPaywall } = useRevenueCat();
     const results = route.params || {};
 
-    // Prevent going back during this critical success state
+    const fullReading = results.reading || 'Your celestial path is being revealed...';
+
     useEffect(() => {
         const backHandler = BackHandler.addEventListener('hardwareBackPress', () => true);
         return () => backHandler.remove();
@@ -36,14 +42,10 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
     };
 
     const handleContinue = () => {
-        // Prioritize interaction/feedback over screen replacement logic
         InteractionManager.runAfterInteractions(() => {
-            // Reset to main tabs
             navigation.replace('MainTabs', results);
         });
     };
-
-    const reading = results.reading || 'Your celestial path is being revealed...';
 
     return (
         <GradientBackground>
@@ -72,42 +74,76 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                                 {t('lifePath')} {results.lifePath}
                             </MysticalText>
                         </View>
-                        <MysticalText variant="body" style={styles.readingText}>
-                            {reading}
-                        </MysticalText>
+
+                        {isPro ? (
+                            fullReading.split('\n\n').map((paragraph, index) => (
+                                <MysticalText key={index} variant="body" style={styles.readingText}>
+                                    {paragraph.trim()}
+                                </MysticalText>
+                            ))
+                        ) : (
+                            <View style={styles.teaserWrapper}>
+                                <View style={styles.teaserTextClip}>
+                                    {fullReading.split('\n\n').map((paragraph, index) => (
+                                        <MysticalText key={index} variant="body" style={styles.readingText}>
+                                            {paragraph.trim()}
+                                        </MysticalText>
+                                    ))}
+                                </View>
+                                <LinearGradient
+                                    colors={['rgba(10,6,18,0)', 'rgba(10,6,18,0.5)', Colors.background, Colors.background]}
+                                    locations={[0, 0.3, 0.7, 1]}
+                                    style={styles.teaserGradient}
+                                    pointerEvents="none"
+                                />
+                                <View style={styles.teaserFadeContent} pointerEvents="none">
+                                    <View style={styles.lockBadge}>
+                                        <Ionicons name="lock-closed" size={28} color={Colors.primary} style={styles.teaserLockIcon} />
+                                        <MysticalText variant="body" style={styles.teaserFadeLabel}>
+                                            {t('teaserFadeLabel')}
+                                        </MysticalText>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
                     </GlassCard>
 
-                    {!isPro && (
-                        <TouchableOpacity style={styles.proUpgradeCard} onPress={presentPaywall}>
-                            <GlassCard style={styles.proUpgradeInner}>
-                                <View style={styles.proHeader}>
-                                    <Sparkles color={Colors.primary} size={24} />
-                                    <MysticalText variant="subtitle" style={styles.proTitle}>
-                                        {t('unlockFullProExperience')}
-                                    </MysticalText>
-                                </View>
-                                <MysticalText variant="caption" style={styles.proDescription}>
-                                    Unlock daily transits, advanced compatibility, and personalized AI oracle insights.
-                                </MysticalText>
-                                <View style={styles.proButton}>
-                                    <MysticalText style={styles.proButtonText}>Upgrade to Pro</MysticalText>
-                                    <ChevronRight color="#000" size={18} />
-                                </View>
-                            </GlassCard>
-                        </TouchableOpacity>
-                    )}
-
                     <View style={styles.actions}>
+                        {!isPro && (
+                            <View style={styles.unlockCtaWrap}>
+                                <TouchableOpacity
+                                    style={styles.premiumCtaButton}
+                                    onPress={presentPaywall}
+                                    activeOpacity={0.85}
+                                >
+                                    <LinearGradient
+                                        colors={['#b794f6', '#9b59b6', '#7d3c98']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={styles.premiumCtaGradient}
+                                    >
+                                        <View style={styles.premiumCtaContent}>
+                                            <Unlock color="#fff" size={24} style={styles.unlockIcon} />
+                                            <MysticalText style={styles.premiumCtaText}>{t('unlockFreeTrial3Days')}</MysticalText>
+                                        </View>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                                <MysticalText variant="caption" style={styles.trialSubtext}>
+                                    {t('trialSubtext')}
+                                </MysticalText>
+                            </View>
+                        )}
                         <Button
                             title={t('viewDashboard')}
                             onPress={handleContinue}
                             variant="primary"
                         />
-
-                        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-                            <Share2 color={Colors.primary} size={20} />
-                            <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
-                        </TouchableOpacity>
+                        {isPro && (
+                            <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                                <Share2 color={Colors.primary} size={20} />
+                                <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </ScrollView>
             </SafeAreaView>
@@ -157,24 +193,90 @@ const styles = StyleSheet.create({
     readingText: {
         lineHeight: 24,
         opacity: 0.9,
+        marginBottom: 16,
     },
-    lockOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(10, 6, 18, 0.85)',
+    teaserWrapper: {
+        position: 'relative',
+        width: '100%',
+    },
+    teaserTextClip: {
+        maxHeight: TEASER_HEIGHT,
+        overflow: 'hidden',
+    },
+    teaserGradient: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: TEASER_HEIGHT * 0.85,
+    },
+    teaserFadeContent: {
+        position: 'absolute',
+        bottom: 12,
+        left: 0,
+        right: 0,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 16,
     },
-    lockContent: {
+    lockBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
-        padding: 20,
+        gap: 10,
+        backgroundColor: 'rgba(10, 6, 18, 0.92)',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(212, 175, 55, 0.4)',
     },
-    unlockTitle: {
+    teaserLockIcon: {
+        marginBottom: 0,
+    },
+    teaserFadeLabel: {
+        textAlign: 'center',
         color: Colors.primary,
-        marginTop: 12,
-        marginBottom: 4,
+        fontWeight: '700',
+        fontSize: 15,
     },
-    unlockSub: {
-        color: Colors.textSecondary,
+    unlockCtaWrap: {
+        width: '100%',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    premiumCtaButton: {
+        width: '100%',
+        borderRadius: 20,
+        overflow: 'hidden',
+        shadowColor: '#9b59b6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    premiumCtaGradient: {
+        paddingVertical: 20,
+        paddingHorizontal: 24,
+        borderRadius: 20,
+    },
+    premiumCtaContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    unlockIcon: {
+        marginTop: -2,
+    },
+    premiumCtaText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    trialSubtext: {
+        marginTop: 8,
+        opacity: 0.7,
         textAlign: 'center',
     },
     actions: {
@@ -191,46 +293,5 @@ const styles = StyleSheet.create({
     shareText: {
         color: Colors.primary,
         fontWeight: '600',
-    },
-    proUpgradeCard: {
-        width: '100%',
-        marginBottom: 32,
-    },
-    proUpgradeInner: {
-        padding: 20,
-        backgroundColor: 'rgba(212, 175, 55, 0.08)',
-        borderColor: Colors.primary,
-        borderWidth: 1,
-    },
-    proHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 8,
-    },
-    proTitle: {
-        color: Colors.primary,
-        fontWeight: '800',
-        fontSize: 18,
-    },
-    proDescription: {
-        opacity: 0.8,
-        marginBottom: 16,
-        lineHeight: 18,
-    },
-    proButton: {
-        flexDirection: 'row',
-        backgroundColor: Colors.primary,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-    },
-    proButtonText: {
-        color: '#000',
-        fontWeight: '700',
-        fontSize: 14,
     },
 });

@@ -7,19 +7,21 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Sun, Book, Users, Eye } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+import { useSettings } from '../../context/SettingsContext';
 
 interface ExpectationsScreenProps {
     onContinue: (expectations: string[]) => void;
 }
 
 const EXPECTATIONS = [
-    { id: 'guidance', label: 'Daily Guidance', sub: 'Start each day with cosmic insights', icon: Sun },
-    { id: 'knowledge', label: 'Deep Self-Knowledge', sub: 'Understand your true nature', icon: Book },
-    { id: 'compatibility', label: 'Compatibility Analysis', sub: 'Find your ideal matches', icon: Users },
-    { id: 'predictions', label: 'Future Predictions', sub: 'Glimpse what lies ahead', icon: Eye },
+    { id: 'guidance', labelKey: 'expectGuidance' as const, subKey: 'expectGuidanceSub' as const, icon: Sun },
+    { id: 'knowledge', labelKey: 'expectKnowledge' as const, subKey: 'expectKnowledgeSub' as const, icon: Book },
+    { id: 'compatibility', labelKey: 'expectCompatibility' as const, subKey: 'expectCompatibilitySub' as const, icon: Users },
+    { id: 'predictions', labelKey: 'expectPredictions' as const, subKey: 'expectPredictionsSub' as const, icon: Eye },
 ];
 
 export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContinue }) => {
+    const { t } = useSettings();
     const [selected, setSelected] = useState<string[]>([]);
 
     const toggleSelect = (id: string) => {
@@ -42,12 +44,12 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
                 delaysContentTouches={false}
             >
                 <MysticalText variant="h1" style={styles.title}>
-                    What do you expect {'\n'}
-                    from <MysticalText variant="h1" color={Colors.primary}>Numerologia AI?</MysticalText>
+                    {t('expectationsTitleLine1')} {'\n'}
+                    {t('expectationsTitleLine2')} <MysticalText variant="h1" color={Colors.primary}>{t('expectationsTitleLine3')}</MysticalText>
                 </MysticalText>
 
                 <MysticalText style={styles.subtitle}>
-                    Select all that apply — we will tailor your experience
+                    {t('expectationsSubtitle')}
                 </MysticalText>
 
                 <View style={styles.options}>
@@ -60,8 +62,8 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
                                         <item.icon color={isActive ? Colors.primary : Colors.textSecondary} size={24} />
                                     </View>
                                     <View style={styles.optionText}>
-                                        <MysticalText variant="body" style={styles.optionTitle}>{item.label}</MysticalText>
-                                        <MysticalText variant="caption" style={styles.optionSub}>{item.sub}</MysticalText>
+                                        <MysticalText variant="body" style={styles.optionTitle}>{t(item.labelKey)}</MysticalText>
+                                        <MysticalText variant="caption" style={styles.optionSub}>{t(item.subKey)}</MysticalText>
                                     </View>
                                     <View style={[styles.checkbox, isActive && styles.checkboxActive]} />
                                 </GlassCard>
@@ -73,12 +75,12 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
 
             <View style={styles.footer}>
                 <Button
-                    title="Continue"
+                    title={t('continue')}
                     onPress={() => onContinue(selected)}
                     disabled={selected.length === 0}
                 />
                 <MysticalText variant="caption" style={styles.footerNote}>
-                    Select at least one option
+                    {t('expectationsFooterNote')}
                 </MysticalText>
             </View>
         </GradientBackground>
