@@ -1,10 +1,11 @@
 import { Alert } from 'react-native';
 import { NumerologyEngine } from '../utils/numerology';
 
-// TODO: Replace with your actual Supabase Project Reference
 const SUPABASE_PROJECT_REF = 'cwnnjhcivkqnqgpmnitj';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3bm5qaGNpdmtxbnFncG1uaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NzYxOTgsImV4cCI6MjA4NjA1MjE5OH0.h6uIZ75nrJGH7PopjA8uuhbKBRacj_5Jmk1ZP0Y46xg';
 const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_REF}.functions.supabase.co/gemini-proxy`;
+/** Edge function password: set via EXPO_PUBLIC_APP_SECRET only (never hardcode). Local: .env. Production: EAS Secrets. */
+const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET ?? '';
 
 const handleError = (error: any) => {
     console.error('AI Service Error:', error);
@@ -16,13 +17,16 @@ const handleError = (error: any) => {
 };
 
 const callProxy = async (prompt: string) => {
+    if (!APP_SECRET && __DEV__) {
+        console.warn('[AI] EXPO_PUBLIC_APP_SECRET is not set. Add it to .env (see .env.example). Edge function will reject requests.');
+    }
     try {
         const response = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'X-App-Secret': 'YOUR_INTERNAL_SECRET_KEY',
+                'X-App-Secret': APP_SECRET,
             },
             body: JSON.stringify({ prompt }),
         });
@@ -216,7 +220,8 @@ RULES:
     },
 
     /**
-     * Generates a daily insight. Optional identity for gendered language.
+     * Generates a daily insight as strict JSON. Optional identity for gendered language.
+     * Returns a string that must be parsed as: { cosmicMessage, energyScore, luckyHour, luckyColor }.
      */
     getDailyInsight: async (
         lifePath: number | string,
@@ -225,9 +230,27 @@ RULES:
     ) => {
         try {
             const identity = context?.identity || '';
-            const prompt = `Provide a single, powerful oracle insight for someone with Life Path ${lifePath} for today. One sentence max.
+            const prompt = `You are a mystical numerologist. For a seeker with Life Path ${lifePath}, provide today's daily insight.
+
 RESPONSE LANGUAGE: ${language}.
-${identity ? `Use grammar that matches the seeker's identity (${identity}) if the language is gendered.` : ''}`;
+${identity ? `Use grammar that matches the seeker's identity (${identity}) if the language is gendered.` : ''}
+
+You MUST respond with ONLY a valid JSON object—no markdown, no code fences, no extra text.
+
+OUTPUT FORMAT (exactly this structure):
+{
+  "cosmicMessage": "One powerful, short oracle sentence for today (1-2 sentences max).",
+  "energyScore": <number from 1 to 100, representing today's cosmic energy level>,
+  "luckyHour": "HH:mm in 24h format (e.g. 14:00 or 09:30)",
+  "luckyColor": "A single color name or short phrase (e.g. Sapphire Blue or Gold)"
+}
+
+RULES:
+- cosmicMessage: string, mystical and personalized to Life Path ${lifePath}.
+- energyScore: integer between 1 and 100.
+- luckyHour: string in 24h format like "14:00".
+- luckyColor: string, one color or short descriptor.
+- Output ONLY the raw JSON object. No \`\`\`json or explanation.`;
 
             return await callProxy(prompt);
         } catch (error) {

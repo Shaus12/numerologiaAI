@@ -16,11 +16,13 @@ interface Language {
 
 const LANGUAGES: Language[] = [
     { id: 'English', name: 'English', flag: '🇺🇸' },
-    { id: 'Hebrew', name: 'עברית', flag: '🇮🇱' },
     { id: 'Spanish', name: 'Español', flag: '🇪🇸' },
     { id: 'Portuguese', name: 'Português', flag: '🇧🇷' },
     { id: 'French', name: 'Français', flag: '🇫🇷' },
     { id: 'German', name: 'Deutsch', flag: '🇩🇪' },
+    { id: 'Russian', name: 'Русский', flag: '🇷🇺' },
+    { id: 'Arabic', name: 'العربية', flag: '🇸🇦' },
+    { id: 'Hebrew', name: 'עברית', flag: '🇮🇱' },
 ];
 
 interface LanguageScreenProps {

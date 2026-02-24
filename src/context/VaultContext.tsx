@@ -7,7 +7,7 @@ const VAULT_STORAGE_KEY = 'vault_connections';
 interface VaultContextType {
     connections: SavedConnection[];
     isLoading: boolean;
-    addConnection: (connection: Omit<SavedConnection, 'id'>) => Promise<void>;
+    addConnection: (connection: Omit<SavedConnection, 'id'>) => Promise<SavedConnection>;
     removeConnection: (id: string) => Promise<void>;
     updateConnection: (id: string, partial: Partial<SavedConnection>) => Promise<void>;
     getConnectionById: (id: string) => SavedConnection | undefined;
@@ -55,11 +55,12 @@ export const VaultProvider: React.FC<VaultProviderProps> = ({ children }) => {
         await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(next));
     }, []);
 
-    const addConnection = useCallback(async (input: Omit<SavedConnection, 'id'>) => {
+    const addConnection = useCallback(async (input: Omit<SavedConnection, 'id'>): Promise<SavedConnection> => {
         const id = `vault_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         const connection: SavedConnection = { ...input, id };
         const next = [...connections, connection];
         await persist(next);
+        return connection;
     }, [connections, persist]);
 
     const removeConnection = useCallback(async (id: string) => {

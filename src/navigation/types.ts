@@ -35,6 +35,8 @@ export type RootStackParamList = {
         dailyNumber: number | string;
     };
     ConnectionReading: { connectionId: string };
+    PrivacyPolicy: undefined;
+    TermsOfUse: undefined;
 };
 
 export type MainTabParamList = {
@@ -54,10 +56,7 @@ export type MainTabParamList = {
         lifePath: number | string;
         language: string;
     };
-    Match: {
-        lifePath: number | string;
-        language: string;
-    };
+    Map: undefined;
     Profile: {
         name: string;
         reading: string;

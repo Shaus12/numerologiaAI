@@ -21,7 +21,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
 export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) => {
     const { t } = useSettings();
-    const { isPro, presentPaywall } = useRevenueCat();
+    const { isPro } = useRevenueCat();
     const results = route.params || {};
 
     const fullReading = results.reading || 'Your celestial path is being revealed...';
@@ -33,8 +33,13 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
 
     const handleShare = async () => {
         try {
+            const readingSnippet = fullReading.split('\n\n')[0]?.trim() || '';
+            const message = readingSnippet
+                ? `${readingSnippet}\n\n— My Life Path: ${results.lifePath}. From my full numerology analysis in Numerologia AI. Discover yours!`
+                : `I just discovered my Life Path is ${results.lifePath}! Unlock your own detailed numerology report with Numerologia AI.`;
             await RNShare.share({
-                message: `I just discovered my Life Path is ${results.lifePath}! The Powerhouse.\n\nUnlock your own detailed numerology report with Numerologia AI.`,
+                message,
+                title: t('shareResult'),
             });
         } catch (error) {
             console.error('Share error:', error);
@@ -113,7 +118,7 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                             <View style={styles.unlockCtaWrap}>
                                 <TouchableOpacity
                                     style={styles.premiumCtaButton}
-                                    onPress={presentPaywall}
+                                    onPress={() => navigation.navigate('Paywall')}
                                     activeOpacity={0.85}
                                 >
                                     <LinearGradient
@@ -138,12 +143,10 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                             onPress={handleContinue}
                             variant="primary"
                         />
-                        {isPro && (
-                            <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-                                <Share2 color={Colors.primary} size={20} />
-                                <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                            <Share2 color={Colors.primary} size={20} />
+                            <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
+                        </TouchableOpacity>
                     </View>
                 </ScrollView>
             </SafeAreaView>

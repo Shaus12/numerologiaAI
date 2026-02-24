@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Share as RNShare } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
@@ -8,7 +8,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
-import { Sparkles, ChevronRight, BookOpen } from 'lucide-react-native';
+import { Sparkles, ChevronRight, BookOpen, Share2 } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
 import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
@@ -16,6 +16,46 @@ import { useUser } from '../../context/UserContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { localeForLanguage } from '../../utils/translations';
 import { requestNotificationPermissions, scheduleDailyMorningReminder } from '../../utils/notifications';
+
+export type DailyInsightData = {
+    cosmicMessage: string;
+    energyScore: number;
+    luckyHour: string;
+    luckyColor: string;
+};
+
+function extractJsonString(raw: string): string {
+    let s = raw.trim();
+    // Strip markdown code fences (e.g. ```json ... ``` or ``` ... ```)
+    const codeFence = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/;
+    const match = s.match(codeFence);
+    if (match) s = match[1].trim();
+    return s;
+}
+
+function parseDailyInsight(raw: string): DailyInsightData {
+    const toParse = extractJsonString(raw);
+    try {
+        const parsed = JSON.parse(toParse) as Record<string, unknown>;
+        const cosmicMessage = typeof parsed.cosmicMessage === 'string' && parsed.cosmicMessage.trim()
+            ? parsed.cosmicMessage.trim() : 'Trust your intuition today.';
+        const energyScore = typeof parsed.energyScore === 'number' && parsed.energyScore >= 1 && parsed.energyScore <= 100
+            ? Math.round(parsed.energyScore) : 50;
+        const luckyHour = typeof parsed.luckyHour === 'string' && parsed.luckyHour.trim()
+            ? parsed.luckyHour.trim() : '—';
+        const luckyColor = typeof parsed.luckyColor === 'string' && parsed.luckyColor.trim()
+            ? parsed.luckyColor.trim() : '—';
+        return { cosmicMessage, energyScore, luckyHour, luckyColor };
+    } catch {
+        // Not valid JSON: treat whole response as cosmic message only
+        return {
+            cosmicMessage: raw.trim() || 'Trust your intuition today.',
+            energyScore: 50,
+            luckyHour: '—',
+            luckyColor: '—',
+        };
+    }
+}
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
     route: { params?: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
@@ -54,7 +94,12 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const dailyNumber = numerologyResults?.dailyNumber ?? route.params?.dailyNumber ?? 0;
 
 
-    const [dailyInsight, setDailyInsight] = React.useState<string>(t('dailyInsight'));
+    const [dailyInsight, setDailyInsight] = React.useState<DailyInsightData>(() => ({
+        cosmicMessage: t('dailyInsight'),
+        energyScore: 50,
+        luckyHour: '—',
+        luckyColor: '—',
+    }));
     const [loadingInsight, setLoadingInsight] = React.useState(true);
     const scrollViewRef = React.useRef<ScrollView>(null);
 
@@ -88,7 +133,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                 // Check cache first
                 const cached = await AsyncStorage.getItem(cacheKey);
                 if (cached) {
-                    setDailyInsight(cached);
+                    setDailyInsight(parseDailyInsight(cached));
                     setLoadingInsight(false);
                     return;
                 }
@@ -96,7 +141,8 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                 // If not cached, fetch from AI
                 const insight = await AIService.getDailyInsight(lifePath, language, userProfile?.identity ? { identity: userProfile.identity } : undefined);
                 if (insight) {
-                    setDailyInsight(insight);
+                    const parsed = parseDailyInsight(insight);
+                    setDailyInsight(parsed);
                     await AsyncStorage.setItem(cacheKey, insight);
                 }
             } catch (error) {
@@ -116,12 +162,9 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         day: 'numeric'
     });
 
-    // Numerical Mapping for the diagram
-    const birthday = lifePath; // Simplified for now
-
     return (
         <GradientBackground>
-            <SafeAreaView style={styles.safe}>
+            <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
                 <ScrollView
                     ref={scrollViewRef}
                     contentContainerStyle={styles.scrollContent}
@@ -140,11 +183,25 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                     {/* Cosmic Message Section */}
                     <GlassCard style={styles.cosmicCard}>
                         <View style={styles.cosmicHeader}>
-                            <Sparkles color={Colors.primary} size={18} />
-                            <MysticalText variant="subtitle" style={styles.cosmicTitle}>{t('cosmicMessage')}</MysticalText>
+                            <View style={styles.cosmicHeaderLeft}>
+                                <Sparkles color={Colors.primary} size={18} />
+                                <MysticalText variant="subtitle" style={styles.cosmicTitle}>{t('cosmicMessage')}</MysticalText>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.shareIconBtn}
+                                onPress={() => {
+                                    const msg = loadingInsight
+                                        ? t('consultingStars')
+                                        : `${dailyInsight.cosmicMessage}\n\n— ${t('shareDailyMessageCta')}`;
+                                    RNShare.share({ message: msg, title: t('cosmicMessage') });
+                                }}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Share2 color={Colors.primary} size={20} />
+                            </TouchableOpacity>
                         </View>
                         <MysticalText variant="body" style={styles.cosmicContent}>
-                            {loadingInsight ? t('consultingStars') : dailyInsight}
+                            {loadingInsight ? t('consultingStars') : dailyInsight.cosmicMessage}
                         </MysticalText>
                     </GlassCard>
 
@@ -196,64 +253,36 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                         </View>
                     </View>
 
-                    {/* YOUR NUMEROLOGY MAP Section */}
+                    {/* Daily Stats (Energy, Lucky Hour, Lucky Color) */}
                     <View style={styles.section}>
-                        <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('numerologyMap')}</MysticalText>
-                        <GlassCard style={styles.mapContainer}>
-                            <View style={styles.mapGraphic}>
-                                {/* Central Core */}
-                                <View style={styles.coreNode}>
-                                    <View style={[styles.nodeCircle, styles.coreCircle]}>
-                                        <MysticalText style={[styles.coreValue, { lineHeight: 40 }]}>{lifePath}</MysticalText>
+                        <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('energyToday')}</MysticalText>
+                        <GlassCard style={styles.dailyStatsCard}>
+                            <View style={styles.dailyStatsRow}>
+                                <View style={styles.energyBlock}>
+                                    <View style={[styles.energyRing, { borderColor: Colors.primary }]}>
+                                        <MysticalText style={[styles.energyScoreText, { color: Colors.primary }]}>
+                                            {dailyInsight.energyScore}
+                                        </MysticalText>
                                     </View>
-                                    <MysticalText variant="caption" style={styles.nodeLabel}>{t('core')}</MysticalText>
+                                    <MysticalText variant="caption" style={styles.energyLabel}>{t('energy')}</MysticalText>
                                 </View>
-
-                                {/* Surrounding Nodes */}
-                                <MapNode label={t('lifePath')} value={lifePath} angle={-90} color="#f1c40f" />
-                                <MapNode label={t('destiny')} value={destiny} angle={30} color={Colors.secondary} />
-                                <MapNode label={t('soulUrge')} value={soulUrge} angle={150} color="#3498db" />
-                                <MapNode label={t('personality')} value={personality} angle={210} color="#e74c3c" />
-                                <MapNode label={t('birthday')} value={birthday} angle={330} color="#2ecc71" />
-
-                                {/* Connection Lines */}
-                                <ConnectionLine angle={-90} />
-                                <ConnectionLine angle={30} />
-                                <ConnectionLine angle={150} />
-                                <ConnectionLine angle={210} />
-                                <ConnectionLine angle={330} />
-                            </View>
-
-                            <View style={styles.legend}>
-                                <LegendItem color="#f1c40f" label={t('lifePath')} value={lifePath} />
-                                <LegendItem color={Colors.secondary} label={t('destiny')} value={destiny} />
-                                <LegendItem color="#3498db" label={t('soulUrge')} value={soulUrge} />
-                                <LegendItem color="#e74c3c" label={t('personality')} value={personality} />
-                                <LegendItem color="#2ecc71" label={t('birthday')} value={birthday} />
+                                <View style={styles.luckyBlock}>
+                                    <GlassCard style={styles.luckyCard}>
+                                        <MysticalText variant="caption" style={styles.luckyLabel}>{t('luckyHour')}</MysticalText>
+                                        <MysticalText variant="body" style={styles.luckyValue} numberOfLines={1}>
+                                            {dailyInsight.luckyHour || '—'}
+                                        </MysticalText>
+                                    </GlassCard>
+                                    <GlassCard style={styles.luckyCard}>
+                                        <MysticalText variant="caption" style={styles.luckyLabel}>{t('luckyColor')}</MysticalText>
+                                        <MysticalText variant="body" style={styles.luckyValue} numberOfLines={2}>
+                                            {dailyInsight.luckyColor || '—'}
+                                        </MysticalText>
+                                    </GlassCard>
+                                </View>
                             </View>
                         </GlassCard>
                     </View>
-
-                    {/* Ask the Oracle Card */}
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => {
-                            touchDebug("HomeOracleCTAPressed");
-                            navigation.navigate('Oracle', { lifePath, language });
-                        }}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <GlassCard style={styles.oracleCTA}>
-                            <View style={styles.oracleIconBox}>
-                                <Sparkles color={Colors.primary} size={24} />
-                            </View>
-                            <View style={styles.oracleTextContent}>
-                                <MysticalText variant="subtitle" style={styles.oracleTitle}>{t('askOracle')}</MysticalText>
-                                <MysticalText variant="caption" style={styles.oracleSub}>{t('oracleSub')}</MysticalText>
-                            </View>
-                            <ChevronRight color={Colors.textSecondary} size={20} />
-                        </GlassCard>
-                    </TouchableOpacity>
 
                 </ScrollView>
             </SafeAreaView>
@@ -267,44 +296,6 @@ const NumberCard = ({ value, label, sub, color }: any) => (
         <MysticalText variant="caption" style={styles.numberCardLabel}>{label}</MysticalText>
         <MysticalText style={styles.numberCardSub}>{sub}</MysticalText>
     </GlassCard>
-);
-
-const MapNode = ({ label, value, angle, color }: any) => {
-    const radius = 80;
-    const x = Math.cos((angle * Math.PI) / 180) * radius;
-    const y = Math.sin((angle * Math.PI) / 180) * radius;
-
-    return (
-        <View style={[styles.node, { transform: [{ translateX: x }, { translateY: y }] }]}>
-            <View style={[styles.nodeCircle, { borderColor: color }]}>
-                <MysticalText style={[styles.nodeValue, { lineHeight: 24 }]}>{value}</MysticalText>
-            </View>
-            <MysticalText variant="caption" style={styles.nodeLabel}>{label}</MysticalText>
-        </View>
-    );
-};
-
-const ConnectionLine = ({ angle }: { angle: number }) => {
-    const radius = 40; // Starts from core edge
-    const length = 40; // Length to reach outer nodes
-    return (
-        <View style={[
-            styles.line,
-            {
-                transform: [
-                    { rotate: `${angle}deg` },
-                    { translateX: radius + length / 2 }
-                ]
-            }
-        ]} />
-    );
-};
-
-const LegendItem = ({ color, label, value }: any) => (
-    <View style={styles.legendItem}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <MysticalText variant="caption" style={styles.legendText}>{label}: {value}</MysticalText>
-    </View>
 );
 
 const styles = StyleSheet.create({
@@ -337,8 +328,16 @@ const styles = StyleSheet.create({
     cosmicHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        justifyContent: 'space-between',
         marginBottom: 10,
+    },
+    cosmicHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    shareIconBtn: {
+        padding: 4,
     },
     cosmicTitle: {
         fontSize: 12,
@@ -396,95 +395,61 @@ const styles = StyleSheet.create({
     },
     numberCardSub: {
         fontSize: 8,
+        lineHeight: 11,
         color: Colors.textSecondary,
         textAlign: 'center',
     },
-    mapContainer: {
-        paddingVertical: 30,
-        alignItems: 'center',
+    dailyStatsCard: {
+        padding: 20,
     },
-    mapGraphic: {
-        width: 250,
-        height: 250,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    coreNode: {
-        zIndex: 10,
-        alignItems: 'center',
-    },
-    nodeCircle: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.2)',
-        backgroundColor: Colors.background,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    coreCircle: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        borderColor: Colors.primary,
-        shadowColor: Colors.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 5,
-    },
-    coreValue: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: Colors.primary,
-    },
-    node: {
-        position: 'absolute',
-        alignItems: 'center',
-    },
-    nodeValue: {
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    nodeLabel: {
-        marginTop: 4,
-        fontSize: 9,
-    },
-    line: {
-        position: 'absolute',
-        width: 40,
-        height: 1,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-    },
-    legend: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 15,
-        marginTop: 10,
-        paddingHorizontal: 20,
-    },
-    legendItem: {
+    dailyStatsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'space-between',
+        gap: 16,
     },
-    dot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+    energyBlock: {
+        alignItems: 'center',
     },
-    legendText: {
-        fontSize: 10,
+    energyRing: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        borderWidth: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 6,
+        overflow: 'visible',
+    },
+    energyScoreText: {
+        fontSize: 28,
+        fontWeight: '700',
+        lineHeight: 32,
+    },
+    energyLabel: {
         color: Colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
-    oracleCTA: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 15,
-        gap: 15,
+    luckyBlock: {
+        flex: 1,
+        minWidth: 100,
+        gap: 10,
+    },
+    luckyCard: {
+        padding: 12,
+        paddingVertical: 10,
+        minHeight: 56,
+    },
+    luckyLabel: {
+        color: Colors.textSecondary,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    luckyValue: {
+        fontWeight: '600',
+        color: Colors.text,
     },
     oracleIconBox: {
         width: 44,

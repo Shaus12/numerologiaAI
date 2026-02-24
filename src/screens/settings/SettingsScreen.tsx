@@ -12,7 +12,7 @@ export const SettingsScreen = () => {
     const navigation = useNavigation();
     const { language, setLanguage, t } = useSettings();
 
-    const LANGUAGES = ['English', 'Spanish', 'Portuguese', 'French', 'German', 'Hebrew'];
+    const LANGUAGES = ['English', 'Spanish', 'Portuguese', 'French', 'German', 'Russian', 'Arabic', 'Hebrew'];
 
     return (
         <GradientBackground>

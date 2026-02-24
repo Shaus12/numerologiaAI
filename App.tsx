@@ -21,20 +21,22 @@ import { CalculatingScreen } from './src/screens/onboarding/CalculatingScreen';
 import { AnalysisCompleteScreen } from './src/screens/onboarding/AnalysisCompleteScreen';
 import { HomeScreen } from './src/screens/main/HomeScreen';
 import { OracleScreen } from './src/screens/main/OracleScreen';
-import { MatchScreen } from './src/screens/main/MatchScreen';
+import { MapScreen } from './src/screens/main/MapScreen';
 import { ProfileScreen } from './src/screens/main/ProfileScreen';
 import { VaultScreen } from './src/screens/main/VaultScreen';
 import { ConnectionReadingScreen } from './src/screens/main/ConnectionReadingScreen';
 import { PaywallScreen } from './src/screens/main/PaywallScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
-import { Home, Sparkles, Heart, User, Lock } from 'lucide-react-native';
+import { Home, Sparkles, Map, User, Lock } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { VaultProvider } from './src/context/VaultContext';
 import { useRevenueCat } from './src/context/RevenueCatContext';
 import { useSettings } from './src/context/SettingsContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { SettingsScreen } from './src/screens/settings/SettingsScreen';
+import { PrivacyPolicyScreen } from './src/screens/legal/PrivacyPolicyScreen';
+import { TermsOfUseScreen } from './src/screens/legal/TermsOfUseScreen';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -49,7 +51,7 @@ function MainTabNavigator({ route }: any) {
   const tabLabel = (name: string) => {
     if (name === 'Home') return t('tabHome');
     if (name === 'Oracle') return t('tabOracle');
-    if (name === 'Match') return t('tabMatch');
+    if (name === 'Map') return t('tabMap');
     if (name === 'Vault') return t('tabVault');
     if (name === 'Profile') return t('tabProfile');
     return name;
@@ -74,7 +76,7 @@ function MainTabNavigator({ route }: any) {
           let icon;
           if (r.name === 'Home') icon = <Home color={color} size={size} />;
           else if (r.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
-          else if (r.name === 'Match') icon = <Heart color={color} size={size} />;
+          else if (r.name === 'Map') icon = <Map color={color} size={size} />;
           else if (r.name === 'Vault') icon = <Lock color={color} size={size} />;
           else icon = <User color={color} size={size} />;
           return <View pointerEvents="none">{icon}</View>;
@@ -91,11 +93,7 @@ function MainTabNavigator({ route }: any) {
         component={OracleScreen}
         initialParams={{ lifePath: results.lifePath, language: results.language }}
       />
-      <Tab.Screen
-        name="Match"
-        component={MatchScreen}
-        initialParams={{ lifePath: results.lifePath, language: results.language }}
-      />
+      <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Vault" component={VaultScreen} />
       <Tab.Screen
         name="Profile"
@@ -281,6 +279,8 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
         <Stack.Screen name="ConnectionReading" component={ConnectionReadingScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        <Stack.Screen name="TermsOfUse" component={TermsOfUseScreen} />
         <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
         <Stack.Screen
           name="MainTabs"

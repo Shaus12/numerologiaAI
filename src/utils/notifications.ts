@@ -74,6 +74,14 @@ export async function requestNotificationPermissions(): Promise<boolean> {
  * Call after permission is granted (e.g. from requestNotificationPermissions).
  */
 export async function scheduleDailyMorningReminder(): Promise<void> {
+    if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('daily-reminder', {
+            name: 'Daily reminder',
+            importance: Notifications.AndroidImportance.HIGH,
+            sound: true,
+            vibrationPattern: [0, 250, 250, 250],
+        });
+    }
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     const body = HEBREW_DAILY_TEASERS[Math.floor(Math.random() * HEBREW_DAILY_TEASERS.length)];

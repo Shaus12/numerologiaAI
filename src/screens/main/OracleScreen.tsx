@@ -149,7 +149,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     };
 
     if (!isPro) {
-        return <OraclePaywallOverlay onBack={handleBack} />;
+        return <OraclePaywallOverlay onBack={handleBack} navigation={navigation} />;
     }
 
     return (
@@ -171,7 +171,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                             </TouchableOpacity>
                             <View style={styles.headerTitle}>
                                 <Sparkles color={Colors.primary} size={24} />
-                                <MysticalText variant="h2">AI Oracle</MysticalText>
+                                <MysticalText variant="h2">{t('tabOracle')}</MysticalText>
                             </View>
                             <View style={{ width: 24 }} />
                         </View>
@@ -194,7 +194,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                                         msg.sender === 'user' ? styles.userCard : styles.oracleCard
                                     ]}>
                                         <MysticalText style={styles.messageText}>{msg.text}</MysticalText>
-                                        {msg.sender === 'oracle' && (
+                                        {msg.sender === 'oracle' && msg.id !== '1' && (
                                             <TouchableOpacity
                                                 style={styles.shareBtn}
                                                 onPress={() => handleShare(msg.text)}
@@ -232,9 +232,9 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                                         multiline
                                         editable={!loading}
                                     />
-                                    {(loading || cooldown || !input.trim()) && (
+                                    {(loading || cooldown) && (
                                         <MysticalText variant="caption" style={styles.statusInfo}>
-                                            {loading ? "Thinking..." : cooldown ? "One moment..." : "Type a message..."}
+                                            {loading ? "Thinking..." : "One moment..."}
                                         </MysticalText>
                                     )}
                                 </View>
@@ -260,7 +260,12 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
                         <GlassCard style={styles.historyModal}>
                             <View style={styles.modalHeader}>
                                 <MysticalText variant="subtitle" style={styles.modalTitle}>{t('recentQuestions')}</MysticalText>
-                                <TouchableOpacity onPress={() => setShowHistory(false)}>
+                                <TouchableOpacity
+                                    onPress={() => setShowHistory(false)}
+                                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                                    style={styles.closeBtn}
+                                    activeOpacity={0.7}
+                                >
                                     <X color={Colors.textSecondary} size={24} />
                                 </TouchableOpacity>
                             </View>
@@ -288,8 +293,11 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
     );
 };
 
-const OraclePaywallOverlay = ({ onBack }: { onBack: () => void }) => {
-    const { presentPaywall } = useRevenueCat();
+const OraclePaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navigation: any }) => {
+    const openPaywall = () => {
+        onBack();
+        navigation.navigate('Paywall');
+    };
 
     return (
         <GradientBackground>
@@ -310,13 +318,13 @@ const OraclePaywallOverlay = ({ onBack }: { onBack: () => void }) => {
                         </MysticalText>
 
                         <MysticalText style={styles.paywallSubtitle}>
-                            Start your 7-day free trial to consult the Oracle and reveal your destiny.
+                            Start your 3-day free trial to consult the Oracle and reveal your destiny.
                         </MysticalText>
 
                         <View style={styles.offerContainer}>
                             <Button
-                                title="Start Your 7-Day Free Trial"
-                                onPress={presentPaywall}
+                                title="Start Your 3-Day Free Trial"
+                                onPress={openPaywall}
                                 style={styles.paywallBtn}
                             />
                             <MysticalText variant="caption" style={styles.cancelText}>
@@ -518,6 +526,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 20,
+    },
+    closeBtn: {
+        padding: 8,
     },
     modalTitle: {
         fontSize: 18,

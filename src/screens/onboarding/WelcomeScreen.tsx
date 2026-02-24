@@ -17,8 +17,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         <GradientBackground style={styles.container}>
             <View style={styles.content}>
                 <View style={styles.symbolContainer}>
-                    {/* This would be a mystical circle SVG or Image */}
-                    <View style={styles.circle} />
+                    <Image
+                        source={require('../../../assets/numrologyAI_logo.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
                 </View>
 
                 <View style={styles.titleRow}>
@@ -56,19 +59,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     symbolContainer: {
-        width: 250,
-        height: 250,
+        width: 220,
+        height: 220,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 40,
     },
-    circle: {
+    logo: {
         width: '100%',
         height: '100%',
-        borderRadius: 125,
-        borderWidth: 1,
-        borderColor: 'rgba(212, 175, 55, 0.2)',
-        opacity: 0.5,
     },
     titleRow: {
         flexDirection: 'row',

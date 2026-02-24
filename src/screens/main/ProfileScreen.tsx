@@ -1,19 +1,34 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Image, Alert, Switch } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image, Alert, Switch, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { Star, User, Calendar, Target, Camera, CreditCard, Globe, Shield, Trash2 } from 'lucide-react-native';
+import { Star, User, Calendar, Target, Camera, CreditCard, Globe, Shield, Trash2, FileText } from 'lucide-react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, MainTabParamList } from '../../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useSettings } from '../../context/SettingsContext';
+import type { Language } from '../../utils/translations';
+
+const LANGUAGE_LABEL_KEYS: Record<Language, string> = {
+    English: 'englishLanguage',
+    Hebrew: 'hebrewLanguage',
+    Spanish: 'spanishLanguage',
+    Portuguese: 'portugueseLanguage',
+    French: 'frenchLanguage',
+    German: 'germanLanguage',
+    Russian: 'russianLanguage',
+    Arabic: 'arabicLanguage',
+};
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { NotificationService } from '../../services/notificationService';
+import { scheduleDailyMorningReminder } from '../../utils/notifications';
 import { touchDebug } from '../../utils/touchDebug';
 import Purchases from 'react-native-purchases';
 import { useUser } from '../../context/UserContext';
@@ -25,7 +40,7 @@ type Props = CompositeScreenProps<
 
 export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     const { language, t, isRTL } = useSettings();
-    const { clearUserData, userProfile, numerologyResults } = useUser();
+    const { clearUserData, userProfile, numerologyResults, saveUserProfile } = useUser();
 
     // Use context (persistent) data as primary, route.params as fallback
     const name = userProfile?.name ?? route.params?.name;
@@ -36,34 +51,78 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     const personalYear = numerologyResults?.personalYear ?? route.params?.personalYear;
     const dailyNumber = numerologyResults?.dailyNumber ?? route.params?.dailyNumber;
 
-    const [image, setImage] = React.useState<string | null>(null);
-    const { isPro, presentPaywall, presentCustomerCenter } = useRevenueCat();
+    const [image, setImage] = React.useState<string | null>(userProfile?.profileImageUri ?? null);
 
+    // Load persisted profile image when userProfile is available
+    React.useEffect(() => {
+        setImage(userProfile?.profileImageUri ?? null);
+    }, [userProfile?.profileImageUri]);
+    const { isPro, presentCustomerCenter } = useRevenueCat();
+
+    const NOTIFICATION_STORAGE_KEY = 'profile_notifications_enabled';
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
+
+    React.useEffect(() => {
+        const loadStored = async () => {
+            try {
+                const stored = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
+                setNotificationsEnabled(stored === 'true');
+            } catch {
+                // keep default false
+            }
+        };
+        loadStored();
+    }, []);
 
     useFocusEffect(
         React.useCallback(() => {
-            const checkPermissions = async () => {
-                const hasPerms = await NotificationService.hasPermissions();
-                setNotificationsEnabled(hasPerms);
+            const syncState = async () => {
+                try {
+                    const stored = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
+                    const { status } = await Notifications.getPermissionsAsync();
+                    const hasPermission = status === 'granted';
+                    if (stored === 'true' && !hasPermission) {
+                        setNotificationsEnabled(false);
+                        await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'false');
+                    } else if (stored === 'true') {
+                        setNotificationsEnabled(true);
+                    } else {
+                        setNotificationsEnabled(stored === 'true');
+                    }
+                } catch {
+                    // keep current state
+                }
             };
-            checkPermissions();
+            syncState();
         }, [])
     );
 
-    const toggleNotifications = async (value: boolean) => {
+    const handleToggleNotification = async (value: boolean) => {
         if (value) {
-            const granted = await NotificationService.requestPermissions();
-            if (granted) {
-                await NotificationService.scheduleDailyReminder();
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+            if (finalStatus === 'granted') {
                 setNotificationsEnabled(true);
+                await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'true');
+                await scheduleDailyMorningReminder();
             } else {
-                setNotificationsEnabled(false);
-                Alert.alert(t('permissionNeeded'), t('enableNotificationsSettings'));
+                Alert.alert(
+                    'Notifications are disabled.',
+                    'Please enable them in your device settings to receive daily insights.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                    ]
+                );
             }
         } else {
-            await NotificationService.cancelAllNotifications();
             setNotificationsEnabled(false);
+            await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'false');
+            await Notifications.cancelAllScheduledNotificationsAsync();
         }
     };
 
@@ -81,8 +140,25 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             quality: 0.8,
         });
 
-        if (!result.canceled) {
-            setImage(result.assets[0].uri);
+        if (result.canceled || !result.assets[0]) return;
+
+        const pickedUri = result.assets[0].uri;
+        try {
+            const filename = `profilePhoto_${Date.now()}.jpg`;
+            const destUri = `${FileSystem.documentDirectory}${filename}`;
+            await FileSystem.copyAsync({ from: pickedUri, to: destUri });
+            setImage(destUri);
+            const updated: Parameters<typeof saveUserProfile>[0] = {
+                name: userProfile?.name ?? '',
+                birthdate: userProfile?.birthdate ?? '',
+                language: userProfile?.language ?? language ?? 'English',
+                ...userProfile,
+                profileImageUri: destUri,
+            };
+            await saveUserProfile(updated);
+        } catch (e) {
+            console.error('Failed to save profile image:', e);
+            Alert.alert('', 'Could not save photo. Please try again.');
         }
     };
 
@@ -140,7 +216,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                         ) : (
                             <TouchableOpacity style={styles.upgradeButton} onPress={() => {
                                 touchDebug("ProfileUpgradePressed");
-                                presentPaywall();
+                                navigation.navigate('Paywall');
                             }}>
                                 <Star color="#FFF" size={16} strokeWidth={2.5} />
                                 <MysticalText style={styles.upgradeText}>{t('upgradePro')}</MysticalText>
@@ -165,7 +241,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                             <MysticalText style={styles.settingsText}>{t('language')}</MysticalText>
                         </TouchableOpacity>
 
-                        <DetailItem icon={User} label={t('language')} value={language === 'Hebrew' ? t('hebrewLanguage') : t('englishLanguage')} />
+                        <DetailItem icon={User} label={t('language')} value={t(LANGUAGE_LABEL_KEYS[language])} />
                         <DetailItem icon={Calendar} label={t('personalYear')} value={personalYear?.toString() || '0'} />
                         <DetailItem icon={Target} label={t('dailyFocus')} value={`${t('vibration')} ${dailyNumber || 0}`} />
 
@@ -178,7 +254,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                             </View>
                             <Switch
                                 value={notificationsEnabled}
-                                onValueChange={toggleNotifications}
+                                onValueChange={handleToggleNotification}
                                 trackColor={{ false: '#767577', true: Colors.primary }}
                                 thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
                             />
@@ -186,10 +262,20 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
 
                         <TouchableOpacity
                             style={styles.settingsButton}
-                            onPress={() => Alert.alert(t('privacyPolicy'), t('privacyPolicyMessage'))}
+                            onPress={() => navigation.navigate('PrivacyPolicy')}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
                             <Shield color={Colors.textSecondary} size={20} />
                             <MysticalText style={styles.settingsText}>{t('privacyPolicy')}</MysticalText>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.settingsButton}
+                            onPress={() => navigation.navigate('TermsOfUse')}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <FileText color={Colors.textSecondary} size={20} />
+                            <MysticalText style={styles.settingsText}>{t('termsOfUse')}</MysticalText>
                         </TouchableOpacity>
 
                         <TouchableOpacity

@@ -47,7 +47,8 @@ async function ensureConfigured(): Promise<boolean> {
         if (Platform.OS !== 'android' && Platform.OS !== 'ios') return false;
         const isConfigured = await Purchases.isConfigured();
         if (!isConfigured) {
-            Purchases.configure({ apiKey: RevenueCatConfig.apiKey });
+            const apiKey = Platform.OS === 'ios' ? RevenueCatConfig.iosApiKey : RevenueCatConfig.androidApiKey;
+            Purchases.configure({ apiKey });
         }
         return true;
     } catch (e) {

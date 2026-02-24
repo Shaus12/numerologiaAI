@@ -65,7 +65,7 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
 
     // Conditional return AFTER hooks
     if (!isPro) {
-        return <MatchPaywallOverlay onBack={handleBack} />;
+        return <MatchPaywallOverlay onBack={handleBack} navigation={navigation} />;
     }
 
     const handleStartScan = async () => {
@@ -177,8 +177,11 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     );
 };
 
-const MatchPaywallOverlay = ({ onBack }: { onBack: () => void }) => {
-    const { presentPaywall } = useRevenueCat();
+const MatchPaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navigation: any }) => {
+    const openPaywall = () => {
+        onBack();
+        navigation.navigate('Paywall');
+    };
 
     return (
         <GradientBackground>
@@ -199,13 +202,13 @@ const MatchPaywallOverlay = ({ onBack }: { onBack: () => void }) => {
                         </MysticalText>
 
                         <MysticalText style={styles.paywallSubtitle}>
-                            Start your 7-day free trial to align your vibrations with another soul.
+                            Start your 3-day free trial to align your vibrations with another soul.
                         </MysticalText>
 
                         <View style={styles.offerContainer}>
                             <Button
-                                title="Start Your 7-Day Free Trial"
-                                onPress={presentPaywall}
+                                title="Start Your 3-Day Free Trial"
+                                onPress={openPaywall}
                                 style={styles.paywallBtn}
                             />
                             <MysticalText variant="caption" style={styles.cancelText}>

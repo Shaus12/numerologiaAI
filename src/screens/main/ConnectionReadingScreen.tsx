@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity, Share as RNShare } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -12,7 +12,7 @@ import { useVault } from '../../context/VaultContext';
 import { useUser } from '../../context/UserContext';
 import { useSettings } from '../../context/SettingsContext';
 import { AIService } from '../../services/ai';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Share2 } from 'lucide-react-native';
 import type { ConnectionCompatibility } from '../../types/vault';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -60,6 +60,34 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
 
     const parsed = useMemo(() => (rawReading ? parseConnectionReading(rawReading) : null), [rawReading]);
     const isLegacyFormat = rawReading != null && parsed == null;
+
+    const handleShare = () => {
+        if (!connection) return;
+        const lines: string[] = [
+            `${t('connectionReadingTitle')}: ${connection.name} (${connection.relationshipType})`,
+            '',
+        ];
+        if (parsed) {
+            lines.push(`${t('compatibilityScore')}: ${parsed.score}/100`);
+            lines.push(parsed.title);
+            lines.push('');
+            if (parsed.strengths.length > 0) {
+                lines.push(`${t('strengthsLabel')}:`);
+                parsed.strengths.forEach((s) => lines.push(`• ${s}`));
+                lines.push('');
+            }
+            if (parsed.challenges.length > 0) {
+                lines.push(`${t('challengesLabel')}:`);
+                parsed.challenges.forEach((c) => lines.push(`• ${c}`));
+                lines.push('');
+            }
+            if (parsed.summary) lines.push(parsed.summary);
+        } else if (rawReading) {
+            lines.push(rawReading);
+        }
+        lines.push('', '— Numerologia AI');
+        RNShare.share({ message: lines.join('\n'), title: t('connectionReadingTitle') });
+    };
 
     const userLifePath = numerologyResults?.lifePath ?? 0;
     const lang = userProfile?.language ?? language ?? 'English';
@@ -117,18 +145,28 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
     return (
         <GradientBackground>
             <SafeAreaView style={styles.container}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}>
-                    <ArrowLeft color="#fff" size={24} />
+                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 48, bottom: 48, left: 48, right: 48 }} activeOpacity={0.7}>
+                    <ArrowLeft color="#fff" size={28} />
                 </TouchableOpacity>
 
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <MysticalText variant="h2" style={styles.title}>{t('connectionReadingTitle')}</MysticalText>
-                    <MysticalText variant="body" style={styles.subtitle}>
-                        {connection.name} · {connection.relationshipType}
-                    </MysticalText>
+                    <View style={styles.titleRow}>
+                        <View>
+                            <MysticalText variant="h2" style={styles.title}>{t('connectionReadingTitle')}</MysticalText>
+                            <MysticalText variant="body" style={styles.subtitle}>
+                                {connection.name} · {connection.relationshipType}
+                            </MysticalText>
+                        </View>
+                        {!loading && (parsed || isLegacyFormat) && (
+                            <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                                <Share2 color={Colors.primary} size={22} />
+                                <MysticalText variant="caption" style={styles.shareBtnLabel}>{t('share')}</MysticalText>
+                            </TouchableOpacity>
+                        )}
+                    </View>
 
                     {loading && (
                         <View style={styles.loadingWrap}>
@@ -148,7 +186,7 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
                         <>
                             <View style={styles.scoreSection}>
                                 <View style={[styles.scoreRing, { borderColor: scoreColor(parsed.score) }]}>
-                                    <MysticalText variant="h1" style={[styles.scoreNumber, { color: scoreColor(parsed.score) }]}>
+                                    <MysticalText variant="h1" style={[styles.scoreNumber, { color: scoreColor(parsed.score) }]} allowFontScaling={false} includeFontPadding={false}>
                                         {parsed.score}
                                     </MysticalText>
                                 </View>
@@ -220,14 +258,33 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     backBtn: {
         position: 'absolute',
-        top: 56,
-        left: 20,
+        top: 44,
+        left: 0,
         zIndex: 10,
-        padding: 12,
+        padding: 24,
+        minWidth: 88,
+        minHeight: 88,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 10,
     },
     scrollContent: { padding: 24, paddingTop: 100, paddingBottom: 48 },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 24,
+    },
     title: { marginBottom: 8 },
-    subtitle: { opacity: 0.8, marginBottom: 28 },
+    subtitle: { opacity: 0.8 },
+    shareBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+    },
+    shareBtnLabel: { color: Colors.primary, fontWeight: '600' },
     loadingWrap: { paddingVertical: 48, alignItems: 'center', gap: 16 },
     loadingText: { opacity: 0.8 },
     card: { padding: 24 },
@@ -246,10 +303,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+        padding: 8,
+        overflow: 'visible',
     },
     scoreNumber: {
         fontSize: 44,
         fontWeight: '800',
+        lineHeight: 52,
+        paddingTop: 2,
     },
     scoreLabel: {
         opacity: 0.7,

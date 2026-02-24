@@ -35,18 +35,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     });
 
     return (
-        <View style={styles.container}>
-            <StatusBar style="dark" />
+        <GradientBackground style={styles.container}>
+            <StatusBar style="light" />
             <View style={styles.content}>
                 <View style={styles.logoContainer}>
                     <Image
-                        source={require('../../assets/mystical_wave_logo.png')}
+                        source={require('../../../assets/numrologyAI_logo.png')}
                         style={styles.logo}
+                        resizeMode="contain"
                     />
                 </View>
-                <MysticalText variant="h2" style={styles.title}>
-                    Numerologia AI
-                </MysticalText>
             </View>
 
             <View style={styles.footer} pointerEvents="none">
@@ -57,7 +55,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                     Downloading {percent}%
                 </MysticalText>
             </View>
-        </View>
+        </GradientBackground>
     );
 };
 
@@ -66,26 +64,18 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
     },
     content: {
         alignItems: 'center',
     },
     logoContainer: {
-        width: 200,
-        height: 200,
-        borderRadius: 40,
-        overflow: 'hidden',
+        width: 220,
+        height: 220,
         marginBottom: 20,
-        // Add shadow/glow if needed
     },
     logo: {
         width: '100%',
         height: '100%',
-    },
-    title: {
-        color: '#0a0612', // Looking at screenshot 1, title is dark? Wait.
-        // Screenshot 1 has white background!
     },
     footer: {
         position: 'absolute',
@@ -96,7 +86,7 @@ const styles = StyleSheet.create({
     progressBarBg: {
         width: '100%',
         height: 2,
-        backgroundColor: 'rgba(0,0,0,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.15)',
         borderRadius: 1,
         overflow: 'hidden',
         marginBottom: 8,
@@ -106,6 +96,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primary,
     },
     loadingText: {
-        color: 'rgba(0,0,0,0.5)',
+        color: Colors.textSecondary,
     },
 });

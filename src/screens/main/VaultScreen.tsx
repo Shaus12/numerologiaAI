@@ -10,8 +10,9 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
+    Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -27,6 +28,14 @@ import type { SavedConnection, RelationshipType } from '../../types/vault';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { localeForLanguage } from '../../utils/translations';
 
+const { height: WINDOW_HEIGHT } = Dimensions.get('window');
+const TAB_BAR_HEIGHT = 60;
+
+function getModalSheetHeight(bottomInset: number) {
+    const menuHeight = TAB_BAR_HEIGHT + bottomInset + 8;
+    return Math.min(WINDOW_HEIGHT - menuHeight, WINDOW_HEIGHT * 0.92, 680);
+}
+
 const RELATIONSHIP_OPTIONS: { type: RelationshipType; labelKey: string; Icon: typeof Heart }[] = [
     { type: 'Romantic', labelKey: 'relationshipRomantic', Icon: Heart },
     { type: 'Colleague', labelKey: 'relationshipColleague', Icon: Briefcase },
@@ -37,9 +46,11 @@ const RELATIONSHIP_OPTIONS: { type: RelationshipType; labelKey: string; Icon: ty
 type Props = BottomTabScreenProps<MainTabParamList, 'Vault'>;
 
 export const VaultScreen: React.FC<Props> = ({ navigation }) => {
+    const insets = useSafeAreaInsets();
     const { t, language } = useSettings();
     const { connections, isLoading, addConnection } = useVault();
-    const { isPro, presentPaywall } = useRevenueCat();
+    const { isPro } = useRevenueCat();
+    const modalSheetHeight = getModalSheetHeight(insets.bottom);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [name, setName] = useState('');
@@ -52,7 +63,7 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
 
     const handleAddPress = () => {
         if (!isPro && connections.length >= 1) {
-            presentPaywall();
+            parentNav?.navigate('Paywall');
             return;
         }
         setModalVisible(true);
@@ -61,7 +72,7 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
     const handleSaveConnection = async () => {
         const trimmedName = name.trim();
         if (!trimmedName) return;
-        await addConnection({
+        const newConnection = await addConnection({
             name: trimmedName,
             birthdate: birthdate.toISOString(),
             relationshipType,
@@ -71,6 +82,9 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
         setRelationshipType('Friend');
         setShowDatePicker(false);
         setModalVisible(false);
+        if (newConnection) {
+            parentNav?.navigate('ConnectionReading', { connectionId: newConnection.id });
+        }
     };
 
     const closeModal = () => {
@@ -126,13 +140,10 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                                     <GlassCard style={styles.card}>
                                         <View style={styles.cardContent}>
                                             <View style={styles.cardLeft}>
-                                                <MysticalText variant="body" style={styles.cardName}>{conn.name}</MysticalText>
-                                                <MysticalText variant="caption" style={styles.cardMeta}>
+                                                <MysticalText variant="body" style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">{conn.name}</MysticalText>
+                                                <MysticalText variant="caption" style={styles.cardMeta} numberOfLines={1} ellipsizeMode="tail">
                                                     {conn.relationshipType} · {new Date(conn.birthdate).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                                                 </MysticalText>
-                                                {conn.cachedReading ? (
-                                                    <MysticalText variant="caption" style={styles.cachedBadge}>{t('vaultReadingSaved')}</MysticalText>
-                                                ) : null}
                                             </View>
                                             <ChevronRight color={Colors.textSecondary} size={22} />
                                         </View>
@@ -159,22 +170,24 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                     animationType="slide"
                     transparent
                     onRequestClose={closeModal}
+                    statusBarTranslucent
                 >
                     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                        <View style={styles.modalOverlay}>
+                        <View style={[styles.modalOverlay, { marginBottom: TAB_BAR_HEIGHT + insets.bottom }]}>
                             <KeyboardAvoidingView
-                                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                                behavior={Platform.OS === 'ios' ? 'height' : undefined}
                                 style={styles.modalKeyboardView}
                                 keyboardVerticalOffset={0}
                             >
                                 <TouchableWithoutFeedback onPress={() => {}}>
-                                    <View style={styles.modalContentWrap}>
+                                    <View style={[styles.modalContentWrap, { maxHeight: modalSheetHeight }]}>
                                         <GlassCard style={styles.modalCard}>
                                             <ScrollView
                                                 style={styles.modalScroll}
                                                 contentContainerStyle={styles.modalScrollContent}
                                                 keyboardShouldPersistTaps="handled"
                                                 showsVerticalScrollIndicator={false}
+                                                bounces={false}
                                             >
                                                 <MysticalText variant="h2" style={styles.modalTitle}>{t('addConnection')}</MysticalText>
 
@@ -268,10 +281,9 @@ const styles = StyleSheet.create({
     list: { gap: 12 },
     card: { padding: 16 },
     cardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    cardLeft: { flex: 1 },
+    cardLeft: { flex: 1, minWidth: 0 },
     cardName: { fontWeight: '700', marginBottom: 4 },
-    cardMeta: { opacity: 0.7 },
-    cachedBadge: { marginTop: 4, color: Colors.primary, fontSize: 11 },
+    cardMeta: { opacity: 0.7, writingDirection: 'ltr' },
     fab: {
         position: 'absolute',
         bottom: 88,
@@ -291,57 +303,62 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.82)',
         justifyContent: 'flex-end',
     },
     modalKeyboardView: {
-        maxHeight: '90%',
+        width: '100%',
+        flex: 1,
+        justifyContent: 'flex-end',
     },
     modalContentWrap: {
-        maxHeight: '90%',
+        width: '100%',
+        flex: 1,
     },
     modalCard: {
+        flex: 1,
         margin: 16,
-        marginBottom: 34,
+        marginBottom: 40,
         padding: 0,
         overflow: 'hidden',
-        maxHeight: '90%',
+        backgroundColor: '#120d1a',
+        borderColor: 'rgba(212, 175, 55, 0.25)',
     },
     modalScroll: {
-        maxHeight: 440,
+        flex: 1,
     },
     modalScrollContent: {
-        padding: 24,
-        paddingBottom: 28,
+        padding: 20,
+        paddingBottom: 40,
     },
-    modalTitle: { marginBottom: 20 },
-    fieldLabel: { marginBottom: 6, opacity: 0.8 },
+    modalTitle: { marginBottom: 14 },
+    fieldLabel: { marginBottom: 4, opacity: 0.8 },
     input: {
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
         borderRadius: 12,
-        padding: 14,
+        padding: 12,
         color: Colors.text,
         fontSize: 16,
-        marginBottom: 20,
+        marginBottom: 14,
     },
     dateTouchable: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 14,
+        paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
-        marginBottom: 12,
+        marginBottom: 10,
     },
     dateDisplayText: { flex: 1 },
     datePickerWrap: {
-        marginBottom: 20,
+        marginBottom: 14,
         alignItems: 'center',
     },
-    relationshipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+    relationshipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
     relationChip: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -356,6 +373,6 @@ const styles = StyleSheet.create({
     relationChipActive: { borderColor: Colors.primary, backgroundColor: 'rgba(212, 175, 55, 0.12)' },
     relationLabel: { color: Colors.textSecondary },
     relationLabelActive: { color: Colors.primary },
-    modalActions: { flexDirection: 'row', gap: 12 },
+    modalActions: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8 },
     modalBtn: { flex: 1 },
 });
