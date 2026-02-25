@@ -4,14 +4,15 @@ import { StatusBar } from 'expo-status-bar';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Colors } from '../../constants/Colors';
+import { useSettings } from '../../context/SettingsContext';
 
 interface SplashScreenProps {
     onFinish: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
+    const { t } = useSettings();
     const [progress] = useState(new Animated.Value(0));
-    const [percent, setPercent] = useState(0);
 
     useEffect(() => {
         Animated.timing(progress, {
@@ -22,11 +23,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
             setTimeout(onFinish, 500);
         });
 
-        const listener = progress.addListener(({ value }) => {
-            setPercent(Math.floor(value * 100));
-        });
-
-        return () => progress.removeListener(listener);
+        return () => {};
     }, []);
 
     const progressWidth = progress.interpolate({
@@ -52,7 +49,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                     <Animated.View style={[styles.progressBarFilled, { width: progressWidth }]} />
                 </View>
                 <MysticalText variant="caption" style={styles.loadingText}>
-                    Downloading {percent}%
+                    {t('loading')}
                 </MysticalText>
             </View>
         </GradientBackground>

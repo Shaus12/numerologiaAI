@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Colors } from '../../constants/Colors';
@@ -9,6 +9,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { useSettings } from '../../context/SettingsContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TermsOfUse'>;
+
+const APPLE_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 export const TermsOfUseScreen: React.FC<Props> = ({ navigation }) => {
     const { t } = useSettings();
@@ -34,6 +36,10 @@ export const TermsOfUseScreen: React.FC<Props> = ({ navigation }) => {
                     showsVerticalScrollIndicator={false}
                 >
                     <MysticalText variant="body" style={styles.paragraph}>{t('termsOfUseIntro')}</MysticalText>
+                    <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('termsOfUseEulaTitle')}</MysticalText>
+                    <TouchableOpacity onPress={() => Linking.openURL(APPLE_EULA_URL)} activeOpacity={0.7}>
+                        <MysticalText variant="body" style={[styles.paragraph, styles.link]}>{t('termsOfUseEulaLink')}</MysticalText>
+                    </TouchableOpacity>
                     <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('termsOfUseAcceptTitle')}</MysticalText>
                     <MysticalText variant="body" style={styles.paragraph}>{t('termsOfUseAcceptBody')}</MysticalText>
                     <MysticalText variant="subtitle" style={styles.sectionTitle}>{t('termsOfUseServiceTitle')}</MysticalText>
@@ -75,6 +81,10 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         opacity: 0.92,
         marginBottom: 8,
+    },
+    link: {
+        color: Colors.primary,
+        textDecorationLine: 'underline',
     },
     lastParagraph: { marginBottom: 32 },
 });

@@ -84,8 +84,10 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     if (stored === 'true' && !hasPermission) {
                         setNotificationsEnabled(false);
                         await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'false');
-                    } else if (stored === 'true') {
+                    } else if (hasPermission) {
                         setNotificationsEnabled(true);
+                        await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'true');
+                        await scheduleDailyMorningReminder();
                     } else {
                         setNotificationsEnabled(stored === 'true');
                     }

@@ -294,6 +294,7 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
 };
 
 const OraclePaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navigation: any }) => {
+    const { t } = useSettings();
     const openPaywall = () => {
         onBack();
         navigation.navigate('Paywall');
@@ -305,7 +306,7 @@ const OraclePaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navi
                 <View style={styles.paywallContainer}>
                     <TouchableOpacity onPress={onBack} style={styles.backButton}>
                         <ArrowLeft color={Colors.textSecondary} size={24} />
-                        <MysticalText style={styles.backText}>Back to Home</MysticalText>
+                        <MysticalText style={styles.backText}>{t('oraclePaywallBack')}</MysticalText>
                     </TouchableOpacity>
 
                     <View style={styles.paywallContent}>
@@ -314,21 +315,21 @@ const OraclePaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navi
                         </View>
 
                         <MysticalText variant="h2" style={styles.paywallTitle}>
-                            Unlock the Oracle
+                            {t('oraclePaywallTitle')}
                         </MysticalText>
 
                         <MysticalText style={styles.paywallSubtitle}>
-                            Start your 3-day free trial to consult the Oracle and reveal your destiny.
+                            {t('oraclePaywallSubtitle')}
                         </MysticalText>
 
                         <View style={styles.offerContainer}>
                             <Button
-                                title="Start Your 3-Day Free Trial"
+                                title={t('startFreeTrial')}
                                 onPress={openPaywall}
                                 style={styles.paywallBtn}
                             />
                             <MysticalText variant="caption" style={styles.cancelText}>
-                                Cancel anytime.
+                                {t('trialSubtext')}
                             </MysticalText>
                         </View>
                     </View>

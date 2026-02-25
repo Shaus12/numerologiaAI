@@ -7,7 +7,8 @@ export type RootStackParamList = {
     Identity: undefined;
     Name: undefined;
     Birthdate: undefined;
-    Calculating: undefined;
+    AIConsent: { userData: any };
+    Calculating: { userData: any };
     BirthTime: undefined;
     EnterBirthTime: undefined;
     Relationship: undefined;

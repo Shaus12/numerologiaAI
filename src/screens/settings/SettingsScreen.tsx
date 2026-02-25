@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Keyboard } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
@@ -45,7 +45,10 @@ export const SettingsScreen = () => {
                                     styles.item,
                                     index !== LANGUAGES.length - 1 && styles.borderBottom
                                 ]}
-                                onPress={() => setLanguage(lang as any)}
+                                onPress={() => {
+                                    Keyboard.dismiss();
+                                    setLanguage(lang as any);
+                                }}
                             >
                                 <MysticalText style={styles.itemText}>{lang}</MysticalText>
                                 {language === lang && <Check color={Colors.primary} size={20} />}

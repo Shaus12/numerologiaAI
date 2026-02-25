@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
     View,
@@ -57,6 +58,15 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
     const [birthdate, setBirthdate] = useState(new Date(1990, 0, 1));
     const [relationshipType, setRelationshipType] = useState<RelationshipType>('Friend');
     const [showDatePicker, setShowDatePicker] = useState(false);
+
+    // On Android, close date picker when leaving this screen so it doesn't appear when changing language in Settings
+    useFocusEffect(
+        React.useCallback(() => {
+            return () => {
+                setShowDatePicker(false);
+            };
+        }, [])
+    );
 
     const locale = localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US';
     const parentNav = navigation.getParent() as any;

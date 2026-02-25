@@ -8,7 +8,8 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
-import { Sparkles, ChevronRight, BookOpen, Share2 } from 'lucide-react-native';
+import { Sparkles, ChevronRight, BookOpen, Share2, Lock } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AIService } from '../../services/ai';
 import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
@@ -16,6 +17,7 @@ import { useUser } from '../../context/UserContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { localeForLanguage } from '../../utils/translations';
 import { requestNotificationPermissions, scheduleDailyMorningReminder } from '../../utils/notifications';
+import { dailyActionGuideByNumber, dailyNumberForGuide } from '../../data/dailyActionGuide';
 
 export type DailyInsightData = {
     cosmicMessage: string;
@@ -67,6 +69,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const { isPro } = useRevenueCat();
 
     const hasStoredReading = Boolean(numerologyResults?.reading?.trim());
+    const parentNav = navigation.getParent() as any;
 
     const onAnalysisCardPress = () => {
         if (!hasStoredReading) return;
@@ -204,6 +207,83 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                             {loadingInsight ? t('consultingStars') : dailyInsight.cosmicMessage}
                         </MysticalText>
                     </GlassCard>
+
+                    {/* Daily Action Guide – full for Pro, teaser for free */}
+                    {(() => {
+                        const guideNum = dailyNumberForGuide(dailyNumber);
+                        const guide = dailyActionGuideByNumber[guideNum];
+                        if (!guide) return null;
+                        const openPaywall = () => parentNav?.navigate('Paywall');
+
+                        if (isPro) {
+                            return (
+                                <GlassCard style={styles.dailyGuideCard}>
+                                    <View style={styles.dailyGuideHeader}>
+                                        <Sparkles color={Colors.primary} size={16} />
+                                        <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
+                                        <View style={styles.dailyGuideBadge}>
+                                            <MysticalText style={styles.dailyGuideBadgeText}>{dailyNumber}</MysticalText>
+                                        </View>
+                                    </View>
+                                    <MysticalText variant="body" style={styles.dailyGuideTheme}>{guide.theme}</MysticalText>
+                                    <View style={styles.dailyGuideSection}>
+                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideText}>{guide.careerWork}</MysticalText>
+                                    </View>
+                                    <View style={styles.dailyGuideSection}>
+                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideText}>{guide.relationships}</MysticalText>
+                                    </View>
+                                    <View style={[styles.dailyGuideSection, styles.dailyGuideActionWrap]}>
+                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideActionText}>{guide.dailyAction}</MysticalText>
+                                    </View>
+                                </GlassCard>
+                            );
+                        }
+
+                        return (
+                            <GlassCard style={styles.dailyGuideCard}>
+                                <View style={styles.dailyGuideHeader}>
+                                    <Sparkles color={Colors.primary} size={16} />
+                                    <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
+                                    <View style={styles.dailyGuideBadge}>
+                                        <MysticalText style={styles.dailyGuideBadgeText}>{dailyNumber}</MysticalText>
+                                    </View>
+                                </View>
+                                <MysticalText variant="body" style={styles.dailyGuideTheme}>{guide.theme}</MysticalText>
+                                <TouchableOpacity
+                                    style={styles.dailyGuideTeaserWrap}
+                                    onPress={openPaywall}
+                                    activeOpacity={1}
+                                >
+                                    <View style={styles.dailyGuideTeaserContent}>
+                                        <View style={styles.dailyGuideSection}>
+                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{guide.careerWork}</MysticalText>
+                                        </View>
+                                        <View style={styles.dailyGuideSection}>
+                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{guide.relationships}</MysticalText>
+                                        </View>
+                                        <View style={styles.dailyGuideSection}>
+                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={1}>{guide.dailyAction}</MysticalText>
+                                        </View>
+                                    </View>
+                                    <LinearGradient
+                                        colors={['rgba(10,6,18,0)', 'rgba(10,6,18,0.7)', 'rgba(10,6,18,0.95)']}
+                                        style={styles.dailyGuideTeaserGradient}
+                                        pointerEvents="none"
+                                    />
+                                    <View style={styles.dailyGuideTeaserCta} pointerEvents="none">
+                                        <Lock color={Colors.primary} size={28} style={styles.dailyGuideTeaserLock} />
+                                        <MysticalText variant="subtitle" style={styles.dailyGuideTeaserCtaText}>{t('dailyGuideUnlockCta')}</MysticalText>
+                                    </View>
+                                </TouchableOpacity>
+                            </GlassCard>
+                        );
+                    })()}
 
                     {/* View full analysis – show for anyone with stored reading; Pro opens analysis, non-Pro opens paywall */}
                     {hasStoredReading && (
@@ -351,6 +431,100 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         fontStyle: 'italic',
         opacity: 0.9,
+    },
+    dailyGuideCard: {
+        padding: 20,
+        marginBottom: 24,
+        borderLeftWidth: 4,
+        borderLeftColor: Colors.secondary,
+    },
+    dailyGuideHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
+    },
+    dailyGuideTitle: {
+        flex: 1,
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.secondary,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
+    dailyGuideBadge: {
+        backgroundColor: 'rgba(155, 89, 182, 0.25)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    dailyGuideBadgeText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.secondary,
+    },
+    dailyGuideTheme: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: Colors.primary,
+        marginBottom: 16,
+        lineHeight: 22,
+    },
+    dailyGuideSection: {
+        marginBottom: 14,
+    },
+    dailyGuideLabel: {
+        color: Colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 4,
+        fontWeight: '600',
+    },
+    dailyGuideText: {
+        fontSize: 14,
+        lineHeight: 21,
+        opacity: 0.92,
+    },
+    dailyGuideActionWrap: {
+        marginBottom: 0,
+        backgroundColor: 'rgba(212, 175, 55, 0.08)',
+        padding: 12,
+        borderRadius: 12,
+        borderLeftWidth: 3,
+        borderLeftColor: Colors.primary,
+    },
+    dailyGuideActionText: {
+        fontSize: 14,
+        lineHeight: 21,
+        fontWeight: '600',
+        color: Colors.text,
+    },
+    dailyGuideTeaserWrap: {
+        position: 'relative',
+        marginTop: 8,
+        minHeight: 140,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    dailyGuideTeaserContent: {
+        paddingVertical: 8,
+        opacity: 0.5,
+    },
+    dailyGuideTeaserGradient: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    dailyGuideTeaserCta: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    dailyGuideTeaserLock: {
+        marginBottom: 10,
+    },
+    dailyGuideTeaserCtaText: {
+        color: Colors.primary,
+        textAlign: 'center',
     },
     viewAnalysisWrap: {
         marginBottom: 20,

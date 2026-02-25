@@ -17,6 +17,7 @@ import { RelationshipScreen } from './src/screens/onboarding/RelationshipScreen'
 import { FocusScreen } from './src/screens/onboarding/FocusScreen';
 import { ChallengeScreen } from './src/screens/onboarding/ChallengeScreen';
 import { ExpectationsScreen } from './src/screens/onboarding/ExpectationsScreen';
+import { AIConsentScreen } from './src/screens/onboarding/AIConsentScreen';
 import { CalculatingScreen } from './src/screens/onboarding/CalculatingScreen';
 import { AnalysisCompleteScreen } from './src/screens/onboarding/AnalysisCompleteScreen';
 import { HomeScreen } from './src/screens/main/HomeScreen';
@@ -275,6 +276,7 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="Challenge" component={ChallengeComponent} />
         <Stack.Screen name="Expectations" component={ExpectationsComponent} />
         <Stack.Screen name="Birthdate" component={BirthdateComponent} />
+        <Stack.Screen name="AIConsent" component={AIConsentComponent} />
         <Stack.Screen name="Calculating" component={CalculatingScreenWrapper} />
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
         <Stack.Screen name="ConnectionReading" component={ConnectionReadingScreen} />

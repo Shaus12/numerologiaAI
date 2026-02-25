@@ -143,10 +143,12 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
                             onPress={handleContinue}
                             variant="primary"
                         />
-                        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-                            <Share2 color={Colors.primary} size={20} />
-                            <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
-                        </TouchableOpacity>
+                        {isPro && (
+                            <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                                <Share2 color={Colors.primary} size={20} />
+                                <MysticalText style={styles.shareText}>{t('shareResult')}</MysticalText>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </ScrollView>
             </SafeAreaView>
