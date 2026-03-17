@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Image } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { Colors } from '../../constants/Colors';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface WelcomeScreenProps {
     onStart: () => void;
@@ -12,6 +13,20 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
+
+    useEffect(() => {
+        if (posthog) {
+            posthog.capture('onboarding_started');
+        }
+    }, [posthog]);
+
+    const handleStart = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'welcome', step_number: 1 });
+        }
+        onStart();
+    };
 
     return (
         <GradientBackground style={styles.container}>
@@ -36,7 +51,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             </View>
 
             <View style={styles.footer}>
-                <Button title={t('startYourJourney')} onPress={onStart} />
+                <Button title={t('startYourJourney')} onPress={handleStart} />
                 <MysticalText variant="caption" style={styles.poweredBy}>
                     {t('poweredBy')}
                 </MysticalText>

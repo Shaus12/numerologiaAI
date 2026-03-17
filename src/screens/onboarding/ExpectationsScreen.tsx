@@ -8,9 +8,11 @@ import { Colors } from '../../constants/Colors';
 import { Sun, Book, Users, Eye } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface ExpectationsScreenProps {
     onContinue: (expectations: string[]) => void;
+    onBack?: () => void;
 }
 
 const EXPECTATIONS = [
@@ -20,9 +22,17 @@ const EXPECTATIONS = [
     { id: 'predictions', labelKey: 'expectPredictions' as const, subKey: 'expectPredictionsSub' as const, icon: Eye },
 ];
 
-export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContinue }) => {
+export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState<string[]>([]);
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'expectations', step_number: 10 });
+        }
+        onContinue(selected);
+    };
 
     const toggleSelect = (id: string) => {
         if (selected.includes(id)) {
@@ -34,7 +44,7 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={8} totalSteps={10} />
+            <OnboardingHeader step={8} totalSteps={11} onBack={onBack} />
 
             <ScrollView
                 style={styles.scroll}
@@ -43,10 +53,12 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
                 keyboardShouldPersistTaps="handled"
                 delaysContentTouches={false}
             >
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('expectationsTitleLine1')} {'\n'}
-                    {t('expectationsTitleLine2')} <MysticalText variant="h1" color={Colors.primary}>{t('expectationsTitleLine3')}</MysticalText>
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('expectationsTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.titleLine}>
+                        {t('expectationsTitleLine2')} <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('expectationsTitleLine3')}</MysticalText>
+                    </MysticalText>
+                </View>
 
                 <MysticalText style={styles.subtitle}>
                     {t('expectationsSubtitle')}
@@ -76,7 +88,7 @@ export const ExpectationsScreen: React.FC<ExpectationsScreenProps> = ({ onContin
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(selected)}
+                    onPress={handleContinue}
                     disabled={selected.length === 0}
                 />
                 <MysticalText variant="caption" style={styles.footerNote}>
@@ -91,7 +103,8 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 25, paddingBottom: 20 },
-    title: { textAlign: 'center', marginBottom: 15 },
+    titleWrap: { marginBottom: 15, alignItems: 'center' },
+    titleLine: { textAlign: 'center' },
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 35 },
     options: { gap: 12 },
     option: { flexDirection: 'row', alignItems: 'center', padding: 15 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity, Share as RNShare } from 'react-native';
+import { StyleSheet, View, ScrollView, ActivityIndicator, TouchableOpacity, Pressable, Share as RNShare } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -13,8 +13,15 @@ import { useUser } from '../../context/UserContext';
 import { useSettings } from '../../context/SettingsContext';
 import { AIService } from '../../services/ai';
 import { ArrowLeft, Share2 } from 'lucide-react-native';
-import type { ConnectionCompatibility } from '../../types/vault';
+import type { ConnectionCompatibility, RelationshipType } from '../../types/vault';
 import { Ionicons } from '@expo/vector-icons';
+
+const RELATIONSHIP_TYPE_KEYS: Record<RelationshipType, string> = {
+    Romantic: 'relationshipRomantic',
+    Colleague: 'relationshipColleague',
+    Family: 'relationshipFamily',
+    Friend: 'relationshipFriend',
+};
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ConnectionReading'>;
 
@@ -48,7 +55,7 @@ function scoreColor(score: number): string {
 }
 
 export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) => {
-    const { connectionId } = route.params;
+    const connectionId = route.params?.connectionId ?? '';
     const { t, language } = useSettings();
     const { getConnectionById, updateConnection } = useVault();
     const { userProfile, numerologyResults } = useUser();
@@ -61,10 +68,20 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
     const parsed = useMemo(() => (rawReading ? parseConnectionReading(rawReading) : null), [rawReading]);
     const isLegacyFormat = rawReading != null && parsed == null;
 
+    const handleBackPress = () => {
+        if (navigation.canGoBack()) {
+            navigation.goBack();
+        } else {
+            navigation.navigate('MainTabs', {
+                screen: 'Vault',
+            } as any);
+        }
+    };
+
     const handleShare = () => {
         if (!connection) return;
         const lines: string[] = [
-            `${t('connectionReadingTitle')}: ${connection.name} (${connection.relationshipType})`,
+            `${t('connectionReadingTitle')}: ${connection.name} (${t(RELATIONSHIP_TYPE_KEYS[connection.relationshipType] ?? 'relationshipFriend')})`,
             '',
         ];
         if (parsed) {
@@ -85,12 +102,12 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
         } else if (rawReading) {
             lines.push(rawReading);
         }
-        lines.push('', '— Numerologia AI');
+        lines.push('', '— Echoes: Numerology Map');
         RNShare.share({ message: lines.join('\n'), title: t('connectionReadingTitle') });
     };
 
     const userLifePath = numerologyResults?.lifePath ?? 0;
-    const lang = userProfile?.language ?? language ?? 'English';
+    const lang = language ?? userProfile?.language ?? 'English';
 
     useEffect(() => {
         if (!connection) return;
@@ -119,7 +136,7 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
                 }
             } catch (e) {
                 if (!cancelled) {
-                    setError('Something went wrong.');
+                    setError(t('somethingWentWrong'));
                 }
             } finally {
                 if (!cancelled) setLoading(false);
@@ -133,10 +150,10 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
         return (
             <GradientBackground>
                 <SafeAreaView style={styles.container}>
-                    <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                    <Pressable style={styles.backBtn} onPress={handleBackPress} hitSlop={24}>
                         <ArrowLeft color="#fff" size={24} />
-                    </TouchableOpacity>
-                    <MysticalText variant="body">Connection not found.</MysticalText>
+                    </Pressable>
+                    <MysticalText variant="body">{t('connectionNotFound')}</MysticalText>
                 </SafeAreaView>
             </GradientBackground>
         );
@@ -145,10 +162,6 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
     return (
         <GradientBackground>
             <SafeAreaView style={styles.container}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 48, bottom: 48, left: 48, right: 48 }} activeOpacity={0.7}>
-                    <ArrowLeft color="#fff" size={28} />
-                </TouchableOpacity>
-
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
@@ -157,7 +170,7 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
                         <View>
                             <MysticalText variant="h2" style={styles.title}>{t('connectionReadingTitle')}</MysticalText>
                             <MysticalText variant="body" style={styles.subtitle}>
-                                {connection.name} · {connection.relationshipType}
+                                {connection.name} · {t(RELATIONSHIP_TYPE_KEYS[connection.relationshipType] ?? 'relationshipFriend')}
                             </MysticalText>
                         </View>
                         {!loading && (parsed || isLegacyFormat) && (
@@ -178,7 +191,7 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
                     {error && (
                         <GlassCard style={styles.card}>
                             <MysticalText variant="body" style={styles.errorText}>{error}</MysticalText>
-                            <Button title={t('continue')} variant="primary" onPress={() => navigation.goBack()} style={{ marginTop: 16 }} />
+                            <Button title={t('continue')} variant="primary" onPress={handleBackPress} style={{ marginTop: 16 }} />
                         </GlassCard>
                     )}
 
@@ -249,6 +262,15 @@ export const ConnectionReadingScreen: React.FC<Props> = ({ route, navigation }) 
                         </GlassCard>
                     )}
                 </ScrollView>
+
+                {/* Rendered AFTER ScrollView so it wins touch events in the overlap area */}
+                <Pressable
+                    style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+                    onPress={handleBackPress}
+                    hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                >
+                    <ArrowLeft color="#fff" size={28} />
+                </Pressable>
             </SafeAreaView>
         </GradientBackground>
     );
@@ -267,7 +289,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
     },
+    backBtnPressed: { opacity: 0.7 },
     scrollContent: { padding: 24, paddingTop: 100, paddingBottom: 48 },
     titleRow: {
         flexDirection: 'row',

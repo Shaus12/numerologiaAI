@@ -25,6 +25,7 @@ const LANGUAGE_LABEL_KEYS: Record<Language, string> = {
     German: 'germanLanguage',
     Russian: 'russianLanguage',
     Arabic: 'arabicLanguage',
+    Bulgarian: 'bulgarianLanguage',
 };
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -87,7 +88,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     } else if (hasPermission) {
                         setNotificationsEnabled(true);
                         await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'true');
-                        await scheduleDailyMorningReminder();
+                        await scheduleDailyMorningReminder(language);
                     } else {
                         setNotificationsEnabled(stored === 'true');
                     }
@@ -96,7 +97,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                 }
             };
             syncState();
-        }, [])
+        }, [language])
     );
 
     const handleToggleNotification = async (value: boolean) => {
@@ -110,7 +111,7 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             if (finalStatus === 'granted') {
                 setNotificationsEnabled(true);
                 await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, 'true');
-                await scheduleDailyMorningReminder();
+                await scheduleDailyMorningReminder(language);
             } else {
                 Alert.alert(
                     'Notifications are disabled.',

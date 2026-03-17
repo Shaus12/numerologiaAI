@@ -8,9 +8,11 @@ import { Colors } from '../../constants/Colors';
 import { Compass, Shield, Zap, TrendingUp, Scale } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface ChallengeScreenProps {
     onContinue: (challenge: string) => void;
+    onBack?: () => void;
 }
 
 const CHALLENGES = [
@@ -21,19 +23,27 @@ const CHALLENGES = [
     { id: 'balance', labelKey: 'challengeBalance' as const, subKey: 'challengeBalanceSub' as const, icon: Scale },
 ];
 
-export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) => {
+export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState<string | null>(null);
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'challenge', step_number: 9 });
+        }
+        onContinue(selected!);
+    };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={7} totalSteps={10} />
+            <OnboardingHeader step={7} totalSteps={11} onBack={onBack} />
 
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" delaysContentTouches={false}>
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('challengeTitleLine1')} {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>{t('challengeTitleLine2')}</MysticalText>
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('challengeTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('challengeTitleLine2')}</MysticalText>
+                </View>
 
                 <MysticalText style={styles.subtitle}>
                     {t('challengeSubtitle')}
@@ -64,7 +74,7 @@ export const ChallengeScreen: React.FC<ChallengeScreenProps> = ({ onContinue }) 
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(selected!)}
+                    onPress={handleContinue}
                     disabled={selected === null}
                 />
             </View>
@@ -76,7 +86,8 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 25, paddingBottom: 20 },
-    title: { textAlign: 'center', marginBottom: 15 },
+    titleWrap: { marginBottom: 15, alignItems: 'center' },
+    titleLine: { textAlign: 'center' },
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 35 },
     options: { gap: 12 },
     option: { flexDirection: 'row', alignItems: 'center', padding: 15 },

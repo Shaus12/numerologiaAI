@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { translations, type Language } from './translations';
 
 /** Optional: avoid requesting on simulators. Safe if expo-device native module is not linked. */
 function isPhysicalDevice(): boolean {
@@ -13,14 +14,10 @@ function isPhysicalDevice(): boolean {
 
 const DAILY_REMINDER_ID = 'numerologia-daily-morning';
 
-const HEBREW_DAILY_TEASERS = [
-    'המספר היומי שלך התעדכן, בוא לגלות מה האנרגיה שלך להיום...',
-    'יש משהו שאתה חייב לדעת על היום הזה לפי הנומרולוגיה...',
-    'ההדרכה היומית שלך מוכנה.',
-    'הכוכבים מחכים לך – גלה את המסר היומי שלך.',
-    'האנרגיה הנומרולוגית של היום מתגלה עכשיו.',
-    'היום יש מספר שמנחה אותך – בוא לראות.',
-];
+function getDailyReminderBody(language: Language): string {
+    const langTranslations = translations[language] || translations['English'];
+    return langTranslations['dailyReminderBody'] || translations['English']['dailyReminderBody'] || 'Your daily insight is ready.';
+}
 
 /**
  * Configure how notifications are presented when the app is in the foreground.
@@ -70,10 +67,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 /**
  * Clear any existing scheduled notifications, then schedule a daily repeating
- * local notification at 08:00 AM. Uses a random Hebrew teaser from the list.
+ * local notification at 08:00 AM. Body text uses the user's selected language.
  * Call after permission is granted (e.g. from requestNotificationPermissions).
  */
-export async function scheduleDailyMorningReminder(): Promise<void> {
+export async function scheduleDailyMorningReminder(language: Language): Promise<void> {
     if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('daily-reminder', {
             name: 'Daily reminder',
@@ -84,12 +81,12 @@ export async function scheduleDailyMorningReminder(): Promise<void> {
     }
     await Notifications.cancelAllScheduledNotificationsAsync();
 
-    const body = HEBREW_DAILY_TEASERS[Math.floor(Math.random() * HEBREW_DAILY_TEASERS.length)];
+    const body = getDailyReminderBody(language);
 
     await Notifications.scheduleNotificationAsync({
         identifier: DAILY_REMINDER_ID,
         content: {
-            title: 'Numerologia AI',
+            title: 'Echoes: Numerology Map',
             body,
             sound: true,
             data: { screen: 'Home', openDailyInsight: true },

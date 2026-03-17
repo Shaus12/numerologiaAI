@@ -6,6 +6,8 @@ export interface UserProfile {
   name: string;
   birthdate: string; // YYYY-MM-DD
   birthTime?: string;
+  birthCountry?: string;
+  birthCity?: string;
   language: string;
   gender?: string;
   profileImageUri?: string; // Persistent profile photo path in app storage

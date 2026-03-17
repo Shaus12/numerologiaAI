@@ -11,6 +11,7 @@ import { LanguageScreen } from './src/screens/onboarding/LanguageScreen';
 import { IdentityScreen } from './src/screens/onboarding/IdentityScreen';
 import { NameScreen } from './src/screens/onboarding/NameScreen';
 import { BirthdateScreen } from './src/screens/onboarding/BirthdateScreen';
+import { PlaceOfBirthScreen } from './src/screens/onboarding/PlaceOfBirthScreen';
 import { BirthTimeScreen } from './src/screens/onboarding/BirthTimeScreen';
 import { EnterBirthTimeScreen } from './src/screens/onboarding/EnterBirthTimeScreen';
 import { RelationshipScreen } from './src/screens/onboarding/RelationshipScreen';
@@ -27,9 +28,13 @@ import { ProfileScreen } from './src/screens/main/ProfileScreen';
 import { VaultScreen } from './src/screens/main/VaultScreen';
 import { ConnectionReadingScreen } from './src/screens/main/ConnectionReadingScreen';
 import { PaywallScreen } from './src/screens/main/PaywallScreen';
+import { PhoneNumberEnergyScreen } from './src/screens/main/PhoneNumberEnergyScreen';
+import { NameEnergyScreen } from './src/screens/main/NameEnergyScreen';
+import { DateEnergyScreen } from './src/screens/main/DateEnergyScreen';
+import { HomeEnergyScreen } from './src/screens/main/HomeEnergyScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
-import { Home, Sparkles, Map, User, Lock } from 'lucide-react-native';
+import { Home, Sparkles, LayoutGrid, User, Lock } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { VaultProvider } from './src/context/VaultContext';
 import { useRevenueCat } from './src/context/RevenueCatContext';
@@ -40,6 +45,7 @@ import { PrivacyPolicyScreen } from './src/screens/legal/PrivacyPolicyScreen';
 import { TermsOfUseScreen } from './src/screens/legal/TermsOfUseScreen';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { PostHogProvider } from 'posthog-react-native';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -52,7 +58,7 @@ function MainTabNavigator({ route }: any) {
   const tabLabel = (name: string) => {
     if (name === 'Home') return t('tabHome');
     if (name === 'Oracle') return t('tabOracle');
-    if (name === 'Map') return t('tabMap');
+    if (name === 'Map') return t('tabToolkit');
     if (name === 'Vault') return t('tabVault');
     if (name === 'Profile') return t('tabProfile');
     return name;
@@ -77,7 +83,7 @@ function MainTabNavigator({ route }: any) {
           let icon;
           if (r.name === 'Home') icon = <Home color={color} size={size} />;
           else if (r.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
-          else if (r.name === 'Map') icon = <Map color={color} size={size} />;
+          else if (r.name === 'Map') icon = <LayoutGrid color={color} size={size} />;
           else if (r.name === 'Vault') icon = <Lock color={color} size={size} />;
           else icon = <User color={color} size={size} />;
           return <View pointerEvents="none">{icon}</View>;
@@ -107,7 +113,13 @@ function MainTabNavigator({ route }: any) {
 
 const MainTabs = (props: any) => <MainTabNavigator {...props} />;
 const CalculatingScreenWrapper = ({ route, navigation }: any) => {
-  const { userData } = route.params;
+  const { userData } = route.params || {};
+  if (!userData) {
+    if (typeof navigation?.replace === 'function') {
+      navigation.replace('Welcome');
+    }
+    return null;
+  }
   return (
     <CalculatingScreen
       userData={userData}
@@ -142,6 +154,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const LanguageComponent = useMemo(() => (props: any) => (
     <LanguageScreen
+      onBack={() => props.navigation.navigate('Welcome')}
       onContinue={(lang: any) => {
         setUserData((prev: any) => ({ ...prev, language: lang }));
         props.navigation.navigate('Identity');
@@ -151,7 +164,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const IdentityComponent = useMemo(() => (props: any) => (
     <IdentityScreen
-      onBack={() => props.navigation.goBack()}
+      onBack={() => props.navigation.navigate('Language')}
       onContinue={(identity: any) => {
         setUserData((prev: any) => ({ ...prev, identity }));
         props.navigation.navigate('Name');
@@ -161,7 +174,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const NameComponent = useMemo(() => (props: any) => (
     <NameScreen
-      onBack={() => props.navigation.goBack()}
+      onBack={() => props.navigation.navigate('Identity')}
       onContinue={(name: any) => {
         setUserData((prev: any) => ({ ...prev, name }));
         props.navigation.navigate('BirthTime');
@@ -171,6 +184,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const BirthTimeComponent = useMemo(() => (props: any) => (
     <BirthTimeScreen
+      onBack={() => props.navigation.navigate('Name')}
       onContinue={(knowsTime: any) => {
         if (knowsTime) {
           props.navigation.navigate('EnterBirthTime');
@@ -184,7 +198,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const EnterBirthTimeComponent = useMemo(() => (props: any) => (
     <EnterBirthTimeScreen
-      onBack={() => props.navigation.goBack()}
+      onBack={() => props.navigation.navigate('BirthTime')}
       onContinue={(timeString: string) => {
         setUserData((prev: any) => ({ ...prev, knowsBirthTime: true, birthTime: timeString }));
         props.navigation.navigate('Relationship');
@@ -194,6 +208,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const RelationshipComponent = useMemo(() => (props: any) => (
     <RelationshipScreen
+      onBack={() => props.navigation.navigate('BirthTime')}
       onContinue={(status: any) => {
         setUserData((prev: any) => ({ ...prev, relationshipStatus: status }));
         props.navigation.navigate('Focus');
@@ -203,6 +218,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const FocusComponent = useMemo(() => (props: any) => (
     <FocusScreen
+      onBack={() => props.navigation.navigate('Relationship')}
       onContinue={(focus: any) => {
         setUserData((prev: any) => ({ ...prev, focus }));
         props.navigation.navigate('Challenge');
@@ -212,6 +228,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const ChallengeComponent = useMemo(() => (props: any) => (
     <ChallengeScreen
+      onBack={() => props.navigation.navigate('Focus')}
       onContinue={(challenge: any) => {
         setUserData((prev: any) => ({ ...prev, challenge }));
         props.navigation.navigate('Expectations');
@@ -221,6 +238,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const ExpectationsComponent = useMemo(() => (props: any) => (
     <ExpectationsScreen
+      onBack={() => props.navigation.navigate('Challenge')}
       onContinue={(expectations: any) => {
         setUserData((prev: any) => ({ ...prev, expectations }));
         props.navigation.navigate('Birthdate');
@@ -228,17 +246,43 @@ const AppContent = (props: { navigationRef: any }) => {
     />
   ), []);
 
-  // No changes needed here, just for context range
   const BirthdateComponent = useMemo(() => (props: any) => (
     <BirthdateScreen
-      onBack={() => props.navigation.goBack()}
+      onBack={() => props.navigation.navigate('Expectations')}
       onContinue={(date: any) => {
-        const fullData = { ...userDataRef.current, birthdate: date.toISOString() };
+        const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+        const birthdate = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const fullData = { ...userDataRef.current, birthdate };
         setUserData(fullData);
-        props.navigation.navigate('Calculating', { userData: fullData });
+        props.navigation.navigate('PlaceOfBirth');
       }}
     />
   ), []);
+
+  const PlaceOfBirthComponent = useMemo(() => (props: any) => (
+    <PlaceOfBirthScreen
+      onBack={() => props.navigation.navigate('Birthdate')}
+      onContinue={(place: { country: string; city: string }) => {
+        const fullData = { ...userDataRef.current, birthCountry: place.country, birthCity: place.city };
+        setUserData(fullData);
+        props.navigation.navigate('AIConsent', { userData: fullData });
+      }}
+    />
+  ), []);
+
+  const AIConsentComponent = useMemo(() => (props: any) => {
+    const { userData: consentUserData } = (props.route.params || {}) as { userData?: any };
+    return (
+      <AIConsentScreen
+        onBack={() => props.navigation.navigate('PlaceOfBirth')}
+        onContinue={() => {
+          if (consentUserData) {
+            props.navigation.navigate('Calculating', { userData: consentUserData });
+          }
+        }}
+      />
+    );
+  }, []);
 
   const hasPersistedData = useMemo(() => !!(userProfile && numerologyResults), [userProfile, numerologyResults]);
   const initialRouteName = hasPersistedData ? "MainTabs" : "Welcome";
@@ -258,13 +302,18 @@ const AppContent = (props: { navigationRef: any }) => {
   return (
     <NavigationContainer ref={props.navigationRef}>
       <StatusBar style="light" />
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade',
-        }}
-        initialRouteName={initialRouteName}
+      <PostHogProvider
+        apiKey="phc_G1OHDdBWXP8y3gY38h5Q4trJXLjTuKtd3WtYeDHf5yc"
+        options={{ host: 'https://us.i.posthog.com' }}
+        autocapture
       >
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+          }}
+          initialRouteName={initialRouteName}
+        >
         <Stack.Screen name="Welcome" component={WelcomeComponent} />
         <Stack.Screen name="Language" component={LanguageComponent} />
         <Stack.Screen name="Identity" component={IdentityComponent} />
@@ -276,6 +325,7 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="Challenge" component={ChallengeComponent} />
         <Stack.Screen name="Expectations" component={ExpectationsComponent} />
         <Stack.Screen name="Birthdate" component={BirthdateComponent} />
+        <Stack.Screen name="PlaceOfBirth" component={PlaceOfBirthComponent} />
         <Stack.Screen name="AIConsent" component={AIConsentComponent} />
         <Stack.Screen name="Calculating" component={CalculatingScreenWrapper} />
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
@@ -284,12 +334,17 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="TermsOfUse" component={TermsOfUseScreen} />
         <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen name="PhoneNumberEnergy" component={PhoneNumberEnergyScreen} />
+        <Stack.Screen name="NameEnergy" component={NameEnergyScreen} />
+        <Stack.Screen name="DateEnergy" component={DateEnergyScreen} />
+        <Stack.Screen name="HomeEnergy" component={HomeEnergyScreen} />
         <Stack.Screen
           name="MainTabs"
           component={MainTabs}
           initialParams={initialParams}
         />
       </Stack.Navigator>
+      </PostHogProvider>
     </NavigationContainer>
   );
 };

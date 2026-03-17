@@ -7,6 +7,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { User, UserPlus, Users, EyeOff, ChevronLeft } from 'lucide-react-native';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface IdentityOption {
     id: string;
@@ -23,7 +24,15 @@ import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState('private');
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'identity', step_number: 3 });
+        }
+        onContinue(selected);
+    };
 
     const options: IdentityOption[] = [
         { id: 'male', label: t('male'), icon: User },
@@ -34,7 +43,7 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={2} totalSteps={10} onBack={onBack} />
+            <OnboardingHeader step={2} totalSteps={11} onBack={onBack} />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -83,7 +92,7 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
             </ScrollView>
 
             <View style={styles.footer}>
-                <Button title={t('continue')} onPress={() => onContinue(selected)} />
+                <Button title={t('continue')} onPress={handleContinue} />
             </View>
         </GradientBackground>
     );
@@ -92,7 +101,6 @@ export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBa
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 25,
-        paddingTop: 60,
         paddingBottom: 50,
     },
     backButton: {

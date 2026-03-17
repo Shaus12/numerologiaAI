@@ -8,9 +8,11 @@ import { Colors } from '../../constants/Colors';
 import { Heart, User, Users, Star, HelpCircle } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface RelationshipScreenProps {
     onContinue: (status: string) => void;
+    onBack?: () => void;
 }
 
 const STATUSES = [
@@ -21,13 +23,21 @@ const STATUSES = [
     { id: 'private', labelKey: 'statusPrivate' as const, subKey: 'statusPrivateSub' as const, icon: User },
 ];
 
-export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContinue }) => {
+export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState<string | null>(null);
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'relationship', step_number: 7 });
+        }
+        onContinue(selected!);
+    };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={5} totalSteps={10} />
+            <OnboardingHeader step={5} totalSteps={11} onBack={onBack} />
 
             <ScrollView
                 style={styles.scroll}
@@ -36,10 +46,10 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
                 keyboardShouldPersistTaps="handled"
                 delaysContentTouches={false}
             >
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('relationshipTitleLine1')} {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>{t('relationshipTitleLine2')}</MysticalText>
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('relationshipTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('relationshipTitleLine2')}</MysticalText>
+                </View>
 
                 <MysticalText style={styles.subtitle}>
                     {t('relationshipSubtitle')}
@@ -70,7 +80,7 @@ export const RelationshipScreen: React.FC<RelationshipScreenProps> = ({ onContin
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(selected!)}
+                    onPress={handleContinue}
                     disabled={selected === null}
                 />
             </View>
@@ -82,7 +92,8 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 25, paddingBottom: 20 },
-    title: { textAlign: 'center', marginBottom: 15 },
+    titleWrap: { marginBottom: 15, alignItems: 'center' },
+    titleLine: { textAlign: 'center' },
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 35 },
     options: { gap: 12 },
     option: { flexDirection: 'row', alignItems: 'center', padding: 15 },

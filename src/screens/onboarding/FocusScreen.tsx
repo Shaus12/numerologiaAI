@@ -8,9 +8,11 @@ import { Colors } from '../../constants/Colors';
 import { Briefcase, Heart, Sparkles, Activity } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface FocusScreenProps {
     onContinue: (focus: string) => void;
+    onBack?: () => void;
 }
 
 const FOCI = [
@@ -20,13 +22,21 @@ const FOCI = [
     { id: 'health', labelKey: 'focusHealth' as const, subKey: 'focusHealthSub' as const, icon: Activity },
 ];
 
-export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
+export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState<string | null>(null);
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'focus', step_number: 8 });
+        }
+        onContinue(selected!);
+    };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={6} totalSteps={10} />
+            <OnboardingHeader step={6} totalSteps={11} onBack={onBack} />
 
             <ScrollView
                 style={styles.scroll}
@@ -35,10 +45,12 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
                 keyboardShouldPersistTaps="handled"
                 delaysContentTouches={false}
             >
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('focusTitleLine1')} {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>{t('focusTitleLine2')}</MysticalText> {t('focusTitleLine3')}
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('focusTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.titleLine}>
+                        <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('focusTitleLine2')}</MysticalText> {t('focusTitleLine3')}
+                    </MysticalText>
+                </View>
 
                 <MysticalText style={styles.subtitle}>
                     {t('focusSubtitle')}
@@ -70,7 +82,7 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue }) => {
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(selected!)}
+                    onPress={handleContinue}
                     disabled={selected === null}
                 />
             </View>
@@ -82,7 +94,8 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     scroll: { flex: 1 },
     scrollContent: { paddingHorizontal: 25, paddingBottom: 20 },
-    title: { textAlign: 'center', marginBottom: 15 },
+    titleWrap: { marginBottom: 15, alignItems: 'center' },
+    titleLine: { textAlign: 'center' },
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 35 },
     options: { gap: 15 },
     option: { padding: 20 },

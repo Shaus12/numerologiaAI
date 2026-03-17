@@ -8,6 +8,7 @@ import { Colors } from '../../constants/Colors';
 import { Sparkles } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface AIConsentScreenProps {
     onBack: () => void;
@@ -16,10 +17,20 @@ interface AIConsentScreenProps {
 
 export const AIConsentScreen: React.FC<AIConsentScreenProps> = ({ onBack, onContinue }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
+
+    const handleContinue = () => {
+        try {
+            if (posthog) {
+                posthog.capture('onboarding_step_completed', { step_name: 'ai_consent', step_number: 13 });
+            }
+        } catch (_) {}
+        onContinue();
+    };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={10} totalSteps={10} onBack={onBack} />
+            <OnboardingHeader step={10} totalSteps={11} onBack={onBack} />
 
             <View style={styles.header}>
                 <View style={styles.iconWrap}>
@@ -40,7 +51,7 @@ export const AIConsentScreen: React.FC<AIConsentScreenProps> = ({ onBack, onCont
             </GlassCard>
 
             <View style={styles.footer}>
-                <Button title={t('aiConsentAccept')} onPress={onContinue} />
+                <Button title={t('aiConsentAccept')} onPress={handleContinue} />
             </View>
         </GradientBackground>
     );

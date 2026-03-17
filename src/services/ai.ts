@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { NumerologyEngine } from '../utils/numerology';
+import { NumerologyEngine, getBirthdateLocalParts } from '../utils/numerology';
 
 const SUPABASE_PROJECT_REF = 'cwnnjhcivkqnqgpmnitj';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3bm5qaGNpdmtxbnFncG1uaXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NzYxOTgsImV4cCI6MjA4NjA1MjE5OH0.h6uIZ75nrJGH7PopjA8uuhbKBRacj_5Jmk1ZP0Y46xg';
@@ -125,14 +125,14 @@ OUTPUT:
             const challenge = context?.challenge || '';
             const relationshipStatus = context?.relationshipStatus || '';
 
-            const prompt = `You are the AI Oracle of Numerologia.
+            const prompt = `You are the AI Oracle of Echoes: Numerology Map.
 A seeker with Life Path ${lifePath} asks: "${question}"
 ${identity ? `Seeker's gender/identity (use for grammar in gendered languages): ${identity}.` : ''}
 ${focus || challenge || relationshipStatus ? `Additional context (weave into the answer where relevant): focus=${focus || '—'}, challenge=${challenge || '—'}, relationship=${relationshipStatus || '—'}.` : ''}
 
 LANGUAGE & GENDER RULE: Respond entirely in the language: ${language}. If that language has gendered grammar (e.g. Hebrew, Spanish), conjugate all verbs, adjectives, and pronouns to match the seeker's identity: "${identity || 'neutral/unknown'}".
 
-Provide a mystical, deep, and insightful answer based on numerological wisdom. Keep it concise (1-2 paragraphs).
+STYLE: Use simple, everyday words. Avoid complex or flowery language—be clear and easy to understand. Keep the answer short: 3–5 sentences maximum (about one short paragraph). Be mystical and insightful but brief and readable.
 If the response language is Hebrew (or RTL), ensure punctuation is compatible with RTL rendering.`;
 
             return await callProxy(prompt);
@@ -216,6 +216,72 @@ RULES:
         } catch (error) {
             handleError(error);
             return "The stars are unclear about this connection.";
+        }
+    },
+
+    /**
+     * Generates a Daily Action Guide as strict JSON based on the Personal Daily Number.
+     * Personal Daily Number = (birthMonth + birthDay + today's day + today's month + today's year digits), reduced to 1–9.
+     * Returns a string parsed as: { dailyNumber, theme, career, relationships, action }.
+     */
+    getDailyActionGuide: async (
+        birthdate: string,             // ISO string or YYYY-MM-DD
+        language: string = 'English',
+        context?: Pick<PersonalizationContext, 'identity'>
+    ) => {
+        try {
+            const identity = context?.identity || '';
+
+            // Compute Personal Daily Number client-side so it's in the prompt (use local date only, no timezone shift)
+            const { month: birthMonth, day: birthDay } = getBirthdateLocalParts(birthdate);
+            const today = new Date();
+            const todayDay = today.getDate();
+            const todayMonth = today.getMonth() + 1;
+            const todayYear = today.getFullYear();
+
+            const reduceToSingleDigit = (n: number): number => {
+                while (n > 9) n = String(n).split('').reduce((a, d) => a + parseInt(d, 10), 0);
+                return n;
+            };
+            const birthPart = reduceToSingleDigit(birthMonth + birthDay);
+            const todayPart = reduceToSingleDigit(todayDay + todayMonth + todayYear);
+            const dailyNumber = reduceToSingleDigit(birthPart + todayPart);
+
+            const prompt = `You are an expert mystical numerologist.
+
+Today's Personal Daily Number for this seeker is: ${dailyNumber}
+
+The number was calculated using Pythagorean numerology:
+- Birth date contribution: birth month (${birthMonth}) + birth day (${birthDay}) = ${birthMonth + birthDay} → reduced to ${birthPart}
+- Today's contribution: day (${todayDay}) + month (${todayMonth}) + year digits (${todayYear}) = ${todayDay + todayMonth + todayYear} → reduced to ${todayPart}
+- Final: ${birthPart} + ${todayPart} = ${birthPart + todayPart} → Daily Number: ${dailyNumber}
+
+Generate a Daily Action Guide for this seeker for today based on the energy of number ${dailyNumber}.
+
+LANGUAGE: ${language}.
+${identity ? `Grammar: use forms matching the seeker's identity (${identity}) if the language has gendered grammar.` : ''}
+
+You MUST respond with ONLY a valid JSON object—no markdown, no code fences, no extra text.
+
+OUTPUT FORMAT (exactly this structure):
+{
+  "dailyNumber": ${dailyNumber},
+  "theme": "Short theme title for number ${dailyNumber} energy (3–6 words)",
+  "career": "2–4 sentences of practical, grounded career and work advice for this energy.",
+  "relationships": "2–4 sentences of relationship and social advice for this energy.",
+  "action": "One concrete, specific action to take today (1–2 sentences)."
+}
+
+RULES:
+- All string values must be in ${language}.
+- Keep the tone mystical yet practical and empowering.
+- Advice must feel personal and actionable, not generic.
+- Output ONLY the raw JSON object. No \`\`\`json or explanation.`;
+
+            return await callProxy(prompt);
+        } catch (error) {
+            handleError(error);
+            return null;
         }
     },
 

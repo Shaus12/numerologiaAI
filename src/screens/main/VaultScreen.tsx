@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
@@ -7,11 +7,11 @@ import {
     TouchableOpacity,
     Modal,
     TextInput,
-    KeyboardAvoidingView,
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientBackground } from '../../components/shared/GradientBackground';
@@ -19,7 +19,7 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Button } from '../../components/ui/Button';
 import { Colors } from '../../constants/Colors';
-import { UserPlus, Heart, Users, User, Briefcase, ChevronRight, Calendar } from 'lucide-react-native';
+import { UserPlus, Heart, Users, User, Briefcase, ChevronRight, Calendar, Trash2 } from 'lucide-react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../../navigation/types';
 import { useVault } from '../../context/VaultContext';
@@ -44,12 +44,19 @@ const RELATIONSHIP_OPTIONS: { type: RelationshipType; labelKey: string; Icon: ty
     { type: 'Friend', labelKey: 'relationshipFriend', Icon: User },
 ];
 
+const RELATIONSHIP_TYPE_KEYS: Record<RelationshipType, string> = {
+    Romantic: 'relationshipRomantic',
+    Colleague: 'relationshipColleague',
+    Family: 'relationshipFamily',
+    Friend: 'relationshipFriend',
+};
+
 type Props = BottomTabScreenProps<MainTabParamList, 'Vault'>;
 
 export const VaultScreen: React.FC<Props> = ({ navigation }) => {
     const insets = useSafeAreaInsets();
     const { t, language } = useSettings();
-    const { connections, isLoading, addConnection } = useVault();
+    const { connections, isLoading, addConnection, removeConnection } = useVault();
     const { isPro } = useRevenueCat();
     const modalSheetHeight = getModalSheetHeight(insets.bottom);
 
@@ -58,6 +65,23 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
     const [birthdate, setBirthdate] = useState(new Date(1990, 0, 1));
     const [relationshipType, setRelationshipType] = useState<RelationshipType>('Friend');
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const addConnectionScrollRef = useRef<ScrollView>(null);
+
+    useEffect(() => {
+        const show = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => setKeyboardHeight(e.endCoordinates.height),
+        );
+        const hide = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setKeyboardHeight(0),
+        );
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, []);
 
     // On Android, close date picker when leaving this screen so it doesn't appear when changing language in Settings
     useFocusEffect(
@@ -106,6 +130,17 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
         parentNav?.navigate('ConnectionReading', { connectionId: connection.id });
     };
 
+    const handleDeleteConnection = (conn: SavedConnection) => {
+        Alert.alert(
+            t('deleteConnection'),
+            t('deleteConnectionConfirm'),
+            [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('delete'), style: 'destructive', onPress: () => removeConnection(conn.id) },
+            ]
+        );
+    };
+
     if (isLoading) {
         return (
             <GradientBackground>
@@ -146,16 +181,29 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                                     key={conn.id}
                                     activeOpacity={0.8}
                                     onPress={() => openReading(conn)}
+                                    onLongPress={() => handleDeleteConnection(conn)}
                                 >
                                     <GlassCard style={styles.card}>
                                         <View style={styles.cardContent}>
                                             <View style={styles.cardLeft}>
                                                 <MysticalText variant="body" style={styles.cardName} numberOfLines={1} ellipsizeMode="tail">{conn.name}</MysticalText>
                                                 <MysticalText variant="caption" style={styles.cardMeta} numberOfLines={1} ellipsizeMode="tail">
-                                                    {conn.relationshipType} · {new Date(conn.birthdate).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    {t(RELATIONSHIP_TYPE_KEYS[conn.relationshipType])} · {new Date(conn.birthdate).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                                                 </MysticalText>
                                             </View>
-                                            <ChevronRight color={Colors.textSecondary} size={22} />
+                                            <View style={styles.cardRight}>
+                                                <TouchableOpacity
+                                                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                                    style={styles.deleteBtn}
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteConnection(conn);
+                                                    }}
+                                                >
+                                                    <Trash2 color={Colors.textSecondary} size={20} />
+                                                </TouchableOpacity>
+                                                <ChevronRight color={Colors.textSecondary} size={22} />
+                                            </View>
                                         </View>
                                     </GlassCard>
                                 </TouchableOpacity>
@@ -183,16 +231,12 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                     statusBarTranslucent
                 >
                     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                        <View style={[styles.modalOverlay, { marginBottom: TAB_BAR_HEIGHT + insets.bottom }]}>
-                            <KeyboardAvoidingView
-                                behavior={Platform.OS === 'ios' ? 'height' : undefined}
-                                style={styles.modalKeyboardView}
-                                keyboardVerticalOffset={0}
-                            >
+                        <View style={[styles.modalOverlay, { paddingBottom: keyboardHeight > 0 ? keyboardHeight : TAB_BAR_HEIGHT + insets.bottom }]}>
                                 <TouchableWithoutFeedback onPress={() => {}}>
                                     <View style={[styles.modalContentWrap, { maxHeight: modalSheetHeight }]}>
                                         <GlassCard style={styles.modalCard}>
                                             <ScrollView
+                                                ref={addConnectionScrollRef}
                                                 style={styles.modalScroll}
                                                 contentContainerStyle={styles.modalScrollContent}
                                                 keyboardShouldPersistTaps="handled"
@@ -209,6 +253,7 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                                                     value={name}
                                                     onChangeText={setName}
                                                     autoCapitalize="words"
+                                                    onFocus={() => addConnectionScrollRef.current?.scrollTo({ y: 0, animated: true })}
                                                 />
 
                                                 <MysticalText variant="caption" style={styles.fieldLabel}>{t('connectionBirthdate')}</MysticalText>
@@ -264,7 +309,6 @@ export const VaultScreen: React.FC<Props> = ({ navigation }) => {
                                         </GlassCard>
                                     </View>
                                 </TouchableWithoutFeedback>
-                            </KeyboardAvoidingView>
                         </View>
                     </TouchableWithoutFeedback>
                 </Modal>
@@ -292,8 +336,10 @@ const styles = StyleSheet.create({
     card: { padding: 16 },
     cardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     cardLeft: { flex: 1, minWidth: 0 },
+    cardRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     cardName: { fontWeight: '700', marginBottom: 4 },
     cardMeta: { opacity: 0.7, writingDirection: 'ltr' },
+    deleteBtn: { padding: 8 },
     fab: {
         position: 'absolute',
         bottom: 88,
@@ -316,27 +362,18 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.82)',
         justifyContent: 'flex-end',
     },
-    modalKeyboardView: {
-        width: '100%',
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
     modalContentWrap: {
         width: '100%',
-        flex: 1,
     },
     modalCard: {
-        flex: 1,
         margin: 16,
-        marginBottom: 40,
+        marginBottom: 16,
         padding: 0,
         overflow: 'hidden',
         backgroundColor: '#120d1a',
         borderColor: 'rgba(212, 175, 55, 0.25)',
     },
-    modalScroll: {
-        flex: 1,
-    },
+    modalScroll: {},
     modalScrollContent: {
         padding: 20,
         paddingBottom: 40,

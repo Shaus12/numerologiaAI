@@ -7,6 +7,7 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Globe } from 'lucide-react-native';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface Language {
     id: string;
@@ -23,26 +24,32 @@ const LANGUAGES: Language[] = [
     { id: 'Russian', name: 'Русский', flag: '🇷🇺' },
     { id: 'Arabic', name: 'العربية', flag: '🇸🇦' },
     { id: 'Hebrew', name: 'עברית', flag: '🇮🇱' },
+    { id: 'Bulgarian', name: 'Български', flag: '🇧🇬' },
 ];
 
 interface LanguageScreenProps {
     onContinue: (lang: string) => void;
+    onBack?: () => void;
 }
 
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
-export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) => {
+export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue, onBack }) => {
     const { t, setLanguage } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState('English');
 
     const handleContinue = async () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'language', step_number: 2 });
+        }
         await setLanguage(selected as any);
         onContinue(selected);
     };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={1} totalSteps={10} />
+            <OnboardingHeader step={1} totalSteps={11} onBack={onBack} />
             <View style={styles.header}>
                 <View style={styles.iconContainer}>
                     <Globe color={Colors.primary} size={40} />
@@ -94,7 +101,6 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue }) =>
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 25,
-        paddingTop: 80,
         paddingBottom: 50,
     },
     header: {

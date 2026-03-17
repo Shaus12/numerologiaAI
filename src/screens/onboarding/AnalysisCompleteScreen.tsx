@@ -13,6 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 /** ~5 lines at lineHeight 24 (2 more before fade) */
 const TEASER_HEIGHT = 128;
@@ -21,6 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AnalysisComplete'>;
 
 export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const { isPro } = useRevenueCat();
     const results = route.params || {};
 
@@ -35,8 +37,8 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
         try {
             const readingSnippet = fullReading.split('\n\n')[0]?.trim() || '';
             const message = readingSnippet
-                ? `${readingSnippet}\n\n— My Life Path: ${results.lifePath}. From my full numerology analysis in Numerologia AI. Discover yours!`
-                : `I just discovered my Life Path is ${results.lifePath}! Unlock your own detailed numerology report with Numerologia AI.`;
+                ? `${readingSnippet}\n\n— My Life Path: ${results.lifePath}. From my full numerology analysis in Echoes: Numerology Map. Discover yours!`
+                : `I just discovered my Life Path is ${results.lifePath}! Unlock your own detailed numerology report with Echoes: Numerology Map.`;
             await RNShare.share({
                 message,
                 title: t('shareResult'),
@@ -47,6 +49,9 @@ export const AnalysisCompleteScreen: React.FC<Props> = ({ route, navigation }) =
     };
 
     const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_completed');
+        }
         InteractionManager.runAfterInteractions(() => {
             navigation.replace('MainTabs', results);
         });

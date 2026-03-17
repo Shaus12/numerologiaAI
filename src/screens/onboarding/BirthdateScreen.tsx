@@ -8,6 +8,7 @@ import { Colors } from '../../constants/Colors';
 import { ChevronLeft, Calendar } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 import { localeForLanguage } from '../../utils/translations';
 
 interface BirthdateScreenProps {
@@ -19,8 +20,16 @@ import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 
 export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, onBack }) => {
     const { t, language } = useSettings();
+    const posthog = usePostHog();
     const [date, setDate] = useState(new Date(1990, 0, 1));
     const [show, setShow] = useState(true);
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'birthdate', step_number: 11 });
+        }
+        onContinue(date);
+    };
 
     const onChange = (event: any, selectedDate?: Date) => {
         const currentDate = selectedDate || date;
@@ -29,13 +38,13 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={9} totalSteps={10} onBack={onBack} />
+            <OnboardingHeader step={9} totalSteps={11} onBack={onBack} />
 
             <View style={styles.header}>
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('birthdateTitleLine1')} {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>{t('birthdateTitleLine2')}</MysticalText>
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('birthdateTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('birthdateTitleLine2')}</MysticalText>
+                </View>
                 <MysticalText variant="subtitle" style={styles.subtitle}>
                     {t('birthdateSubtitle')}
                 </MysticalText>
@@ -62,7 +71,7 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
             </View>
 
             <View style={styles.footer}>
-                <Button title={t('continue')} onPress={() => onContinue(date)} />
+                <Button title={t('continue')} onPress={handleContinue} />
             </View>
         </GradientBackground>
     );
@@ -71,7 +80,6 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 25,
-        paddingTop: 60,
         paddingBottom: 50,
     },
     backButton: {
@@ -107,8 +115,12 @@ const styles = StyleSheet.create({
     header: {
         marginBottom: 30,
     },
-    title: {
+    titleWrap: {
         marginBottom: 10,
+        alignItems: 'center',
+    },
+    titleLine: {
+        textAlign: 'center',
         fontSize: 28,
     },
     subtitle: {

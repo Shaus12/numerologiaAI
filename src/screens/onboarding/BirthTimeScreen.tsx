@@ -8,28 +8,40 @@ import { Colors } from '../../constants/Colors';
 import { Clock } from 'lucide-react-native';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 
 interface BirthTimeScreenProps {
     onContinue: (knowsTime: boolean) => void;
+    onBack?: () => void;
 }
 
-export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue }) => {
+export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const [selected, setSelected] = useState<boolean | null>(null);
+
+    const handleContinue = () => {
+        try {
+            if (posthog) {
+                posthog.capture('onboarding_step_completed', { step_name: 'birth_time', step_number: 5 });
+            }
+        } catch (_) {}
+        onContinue(selected === true);
+    };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={4} totalSteps={10} />
+            <OnboardingHeader step={4} totalSteps={11} onBack={onBack} />
 
             <View style={styles.content}>
                 <View style={styles.iconContainer}>
                     <Clock color={Colors.primary} size={40} />
                 </View>
 
-                <MysticalText variant="h1" style={styles.title}>
-                    {t('birthTimeTitleLine1')} {'\n'}
-                    <MysticalText variant="h1" color={Colors.primary}>{t('birthTimeTitleLine2')}</MysticalText>
-                </MysticalText>
+                <View style={styles.titleWrap}>
+                    <MysticalText variant="h1" style={styles.titleLine}>{t('birthTimeTitleLine1')}</MysticalText>
+                    <MysticalText variant="h1" color={Colors.primary} style={styles.titleLine}>{t('birthTimeTitleLine2')}</MysticalText>
+                </View>
 
                 <MysticalText style={styles.subtitle}>
                     {t('birthTimeSubtitle')}
@@ -54,7 +66,7 @@ export const BirthTimeScreen: React.FC<BirthTimeScreenProps> = ({ onContinue }) 
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(selected === true)}
+                    onPress={handleContinue}
                     disabled={selected === null}
                 />
             </View>
@@ -82,7 +94,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(155, 89, 182, 0.2)', // Purple tint for clock
         justifyContent: 'center', alignItems: 'center', marginBottom: 25,
     },
-    title: { textAlign: 'center', marginBottom: 15 },
+    titleWrap: { marginBottom: 15, alignItems: 'center' },
+    titleLine: { textAlign: 'center' },
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 40 },
     options: { width: '100%', gap: 15 },
     option: { flexDirection: 'row', alignItems: 'center', padding: 20 },

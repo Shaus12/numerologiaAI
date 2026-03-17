@@ -82,10 +82,10 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
 
     const handleShare = async (text: string) => {
         try {
-            const message = `Check out my mystical reading from Numerologia AI:\n\n"${text}"\n\nDownload the app to discover your destiny!`;
+            const message = `Check out my mystical reading from Echoes: Numerology Map:\n\n"${text}"\n\nDownload the app to discover your destiny!`;
             await RNShare.share({
                 message,
-                title: 'Mystical Reading from Numerologia AI'
+                title: 'Mystical Reading from Echoes: Numerology Map'
             });
         } catch (error) {
             console.error(error);

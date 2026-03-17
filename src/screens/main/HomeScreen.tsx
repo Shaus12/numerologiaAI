@@ -17,13 +17,21 @@ import { useUser } from '../../context/UserContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { localeForLanguage } from '../../utils/translations';
 import { requestNotificationPermissions, scheduleDailyMorningReminder } from '../../utils/notifications';
-import { dailyActionGuideByNumber, dailyNumberForGuide } from '../../data/dailyActionGuide';
+import { dailyNumberForGuide } from '../../data/dailyActionGuide';
 
 export type DailyInsightData = {
     cosmicMessage: string;
     energyScore: number;
     luckyHour: string;
     luckyColor: string;
+};
+
+export type DailyActionGuideData = {
+    dailyNumber: number;
+    theme: string;
+    career: string;
+    relationships: string;
+    action: string;
 };
 
 function extractJsonString(raw: string): string {
@@ -33,6 +41,31 @@ function extractJsonString(raw: string): string {
     const match = s.match(codeFence);
     if (match) s = match[1].trim();
     return s;
+}
+
+function parseDailyActionGuide(raw: string): DailyActionGuideData | null {
+    if (!raw) return null;
+    const toParse = extractJsonString(raw);
+    try {
+        const parsed = JSON.parse(toParse) as Record<string, unknown>;
+        if (
+            typeof parsed.theme === 'string' &&
+            typeof parsed.career === 'string' &&
+            typeof parsed.relationships === 'string' &&
+            typeof parsed.action === 'string'
+        ) {
+            return {
+                dailyNumber: typeof parsed.dailyNumber === 'number' ? parsed.dailyNumber : 0,
+                theme: parsed.theme.trim(),
+                career: parsed.career.trim(),
+                relationships: parsed.relationships.trim(),
+                action: parsed.action.trim(),
+            };
+        }
+        return null;
+    } catch {
+        return null;
+    }
 }
 
 function parseDailyInsight(raw: string): DailyInsightData {
@@ -62,6 +95,43 @@ function parseDailyInsight(raw: string): DailyInsightData {
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'> & {
     route: { params?: MainTabParamList['Home'] & { openDailyInsight?: boolean } }
 };
+
+const MapNode = ({
+    label,
+    value,
+    angle,
+    color,
+}: {
+    label: string;
+    value: number;
+    angle: number;
+    color: string;
+}) => {
+    const radius = 80;
+    const x = Math.cos((angle * Math.PI) / 180) * radius;
+    const y = Math.sin((angle * Math.PI) / 180) * radius;
+    return (
+        <View style={[styles.mapNode, { transform: [{ translateX: x }, { translateY: y }] }]}>
+            <View style={[styles.mapNodeCircle, { borderColor: color }]}>
+                <MysticalText style={[styles.mapNodeValue, { color }]}>{value}</MysticalText>
+            </View>
+            <MysticalText variant="caption" style={styles.mapNodeLabel}>{label}</MysticalText>
+        </View>
+    );
+};
+
+const ConnectionLine = ({ angle }: { angle: number }) => (
+    <View
+        style={[
+            styles.mapLine,
+            {
+                transform: [{ rotate: `${angle}deg` }, { translateX: 35 }],
+            },
+        ]}
+    >
+        <View style={styles.mapLineGlow} />
+    </View>
+);
 
 export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const { language, t } = useSettings();
@@ -104,6 +174,9 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         luckyColor: '—',
     }));
     const [loadingInsight, setLoadingInsight] = React.useState(true);
+
+    const [dailyGuide, setDailyGuide] = React.useState<DailyActionGuideData | null>(null);
+    const [loadingGuide, setLoadingGuide] = React.useState(true);
     const scrollViewRef = React.useRef<ScrollView>(null);
 
     React.useEffect(() => {
@@ -118,14 +191,14 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
             try {
                 const granted = await requestNotificationPermissions();
                 if (granted) {
-                    await scheduleDailyMorningReminder();
+                    await scheduleDailyMorningReminder(language);
                 }
             } catch (e) {
                 // Ignore; permission or scheduling can fail on simulators or if user denies
             }
         }, 1800);
         return () => clearTimeout(timer);
-    }, []);
+    }, [language]);
 
     React.useEffect(() => {
         const fetchInsight = async () => {
@@ -156,6 +229,40 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         };
         fetchInsight();
     }, [lifePath, language]);
+
+    React.useEffect(() => {
+        if (!userProfile?.birthdate) {
+            setLoadingGuide(false);
+            return;
+        }
+        const fetchGuide = async () => {
+            const todayKey = new Date().toISOString().split('T')[0];
+            const cacheKey = `daily_action_guide_${userProfile.birthdate}_${language}_${todayKey}`;
+            try {
+                const cached = await AsyncStorage.getItem(cacheKey);
+                if (cached) {
+                    setDailyGuide(parseDailyActionGuide(cached));
+                    setLoadingGuide(false);
+                    return;
+                }
+                const raw = await AIService.getDailyActionGuide(
+                    userProfile.birthdate,
+                    language,
+                    userProfile?.identity ? { identity: userProfile.identity } : undefined,
+                );
+                if (raw) {
+                    const parsed = parseDailyActionGuide(raw);
+                    setDailyGuide(parsed);
+                    await AsyncStorage.setItem(cacheKey, raw);
+                }
+            } catch (error) {
+                console.error('Daily guide fetch error:', error);
+            } finally {
+                setLoadingGuide(false);
+            }
+        };
+        fetchGuide();
+    }, [userProfile?.birthdate, language]);
 
     const today = new Date();
     const locale = localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US';
@@ -210,10 +317,12 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
 
                     {/* Daily Action Guide – full for Pro, teaser for free */}
                     {(() => {
-                        const guideNum = dailyNumberForGuide(dailyNumber);
-                        const guide = dailyActionGuideByNumber[guideNum];
-                        if (!guide) return null;
                         const openPaywall = () => parentNav?.navigate('Paywall');
+                        const guideDisplayNumber = dailyGuide?.dailyNumber ?? dailyNumberForGuide(dailyNumber);
+                        const theme = loadingGuide ? '…' : (dailyGuide?.theme ?? '…');
+                        const career = loadingGuide ? t('consultingStars') : (dailyGuide?.career ?? '');
+                        const relationships = loadingGuide ? '' : (dailyGuide?.relationships ?? '');
+                        const action = loadingGuide ? '' : (dailyGuide?.action ?? '');
 
                         if (isPro) {
                             return (
@@ -222,21 +331,21 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                                         <Sparkles color={Colors.primary} size={16} />
                                         <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
                                         <View style={styles.dailyGuideBadge}>
-                                            <MysticalText style={styles.dailyGuideBadgeText}>{dailyNumber}</MysticalText>
+                                            <MysticalText style={styles.dailyGuideBadgeText}>{guideDisplayNumber}</MysticalText>
                                         </View>
                                     </View>
-                                    <MysticalText variant="body" style={styles.dailyGuideTheme}>{guide.theme}</MysticalText>
+                                    <MysticalText variant="body" style={styles.dailyGuideTheme}>{theme}</MysticalText>
                                     <View style={styles.dailyGuideSection}>
                                         <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideText}>{guide.careerWork}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideText}>{career}</MysticalText>
                                     </View>
                                     <View style={styles.dailyGuideSection}>
                                         <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideText}>{guide.relationships}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideText}>{relationships}</MysticalText>
                                     </View>
                                     <View style={[styles.dailyGuideSection, styles.dailyGuideActionWrap]}>
                                         <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideActionText}>{guide.dailyAction}</MysticalText>
+                                        <MysticalText variant="body" style={styles.dailyGuideActionText}>{action}</MysticalText>
                                     </View>
                                 </GlassCard>
                             );
@@ -248,10 +357,10 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                                     <Sparkles color={Colors.primary} size={16} />
                                     <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
                                     <View style={styles.dailyGuideBadge}>
-                                        <MysticalText style={styles.dailyGuideBadgeText}>{dailyNumber}</MysticalText>
+                                        <MysticalText style={styles.dailyGuideBadgeText}>{guideDisplayNumber}</MysticalText>
                                     </View>
                                 </View>
-                                <MysticalText variant="body" style={styles.dailyGuideTheme}>{guide.theme}</MysticalText>
+                                <MysticalText variant="body" style={styles.dailyGuideTheme}>{theme}</MysticalText>
                                 <TouchableOpacity
                                     style={styles.dailyGuideTeaserWrap}
                                     onPress={openPaywall}
@@ -260,15 +369,15 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                                     <View style={styles.dailyGuideTeaserContent}>
                                         <View style={styles.dailyGuideSection}>
                                             <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{guide.careerWork}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{career}</MysticalText>
                                         </View>
                                         <View style={styles.dailyGuideSection}>
                                             <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{guide.relationships}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{relationships}</MysticalText>
                                         </View>
                                         <View style={styles.dailyGuideSection}>
                                             <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={1}>{guide.dailyAction}</MysticalText>
+                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={1}>{action}</MysticalText>
                                         </View>
                                     </View>
                                     <LinearGradient
@@ -306,6 +415,43 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                                 <ChevronRight color={Colors.textSecondary} size={20} />
                             </GlassCard>
                         </TouchableOpacity>
+                    )}
+
+                    {/* Numerology Map – diagram (after View full analysis, before Your numbers) */}
+                    {(lifePath > 0 || destiny > 0 || soulUrge > 0 || personality > 0) && (
+                        <View style={styles.mapSection}>
+                            <MysticalText variant="subtitle" style={styles.mapSectionTitle}>{t('numerologyMap')}</MysticalText>
+                            <View style={styles.mapContainer}>
+                                <View style={styles.mapGraphic}>
+                                    <View style={styles.mapCoreNode}>
+                                        <View style={[styles.mapNodeCircle, styles.mapCoreCircle]}>
+                                            <MysticalText style={[styles.mapCoreValue, { lineHeight: 40 }]}>{lifePath}</MysticalText>
+                                        </View>
+                                        <MysticalText variant="caption" style={styles.mapNodeLabel}>{t('core')}</MysticalText>
+                                    </View>
+                                    <MapNode label={t('destiny')} value={destiny} angle={-90} color={Colors.secondary} />
+                                    <MapNode label={t('soulUrge')} value={soulUrge} angle={30} color="#3498db" />
+                                    <MapNode label={t('personality')} value={personality} angle={150} color="#e74c3c" />
+                                    <ConnectionLine angle={-90} />
+                                    <ConnectionLine angle={30} />
+                                    <ConnectionLine angle={150} />
+                                </View>
+                                <View style={styles.mapLegend}>
+                                    <View style={styles.mapLegendItem}>
+                                        <View style={[styles.mapDot, { backgroundColor: Colors.secondary }]} />
+                                        <MysticalText variant="caption" style={styles.mapLegendText}>{t('destiny')}: {destiny}</MysticalText>
+                                    </View>
+                                    <View style={styles.mapLegendItem}>
+                                        <View style={[styles.mapDot, { backgroundColor: '#3498db' }]} />
+                                        <MysticalText variant="caption" style={styles.mapLegendText}>{t('soulUrge')}: {soulUrge}</MysticalText>
+                                    </View>
+                                    <View style={styles.mapLegendItem}>
+                                        <View style={[styles.mapDot, { backgroundColor: '#e74c3c' }]} />
+                                        <MysticalText variant="caption" style={styles.mapLegendText}>{t('personality')}: {personality}</MysticalText>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
                     )}
 
                     {/* YOUR NUMBERS Section */}
@@ -536,6 +682,113 @@ const styles = StyleSheet.create({
         gap: 15,
         borderLeftWidth: 4,
         borderLeftColor: Colors.primary,
+    },
+    mapSection: {
+        marginBottom: 25,
+    },
+    mapSectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.textSecondary,
+        letterSpacing: 2,
+        marginBottom: 15,
+        textTransform: 'uppercase',
+    },
+    mapContainer: {
+        paddingVertical: 30,
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+    },
+    mapGraphic: {
+        width: 250,
+        height: 250,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    mapCoreNode: {
+        zIndex: 10,
+        alignItems: 'center',
+    },
+    mapNodeCircle: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: Colors.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mapCoreCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        borderColor: Colors.primary,
+        borderWidth: 2,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.85,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    mapCoreValue: {
+        fontSize: 32,
+        fontWeight: '700',
+        color: Colors.primary,
+    },
+    mapNode: {
+        position: 'absolute',
+        alignItems: 'center',
+    },
+    mapNodeValue: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    mapNodeLabel: {
+        marginTop: 4,
+        fontSize: 9,
+    },
+    mapLine: {
+        position: 'absolute',
+        width: 40,
+        height: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mapLineGlow: {
+        position: 'absolute',
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: 'rgba(212, 175, 55, 0.5)',
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    mapLegend: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 15,
+        marginTop: 10,
+        paddingHorizontal: 20,
+    },
+    mapLegendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    mapDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    mapLegendText: {
+        fontSize: 10,
+        color: Colors.textSecondary,
     },
     section: { marginBottom: 25 },
     sectionTitle: {

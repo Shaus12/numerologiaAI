@@ -7,6 +7,7 @@ export type RootStackParamList = {
     Identity: undefined;
     Name: undefined;
     Birthdate: undefined;
+    PlaceOfBirth: undefined;
     AIConsent: { userData: any };
     Calculating: { userData: any };
     BirthTime: undefined;
@@ -36,6 +37,10 @@ export type RootStackParamList = {
         dailyNumber: number | string;
     };
     ConnectionReading: { connectionId: string };
+    PhoneNumberEnergy: undefined;
+    NameEnergy: undefined;
+    DateEnergy: undefined;
+    HomeEnergy: undefined;
     PrivacyPolicy: undefined;
     TermsOfUse: undefined;
 };

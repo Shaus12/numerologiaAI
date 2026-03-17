@@ -6,6 +6,8 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
@@ -17,6 +19,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 import { Sparkles, CheckCircle2, X } from 'lucide-react-native';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
@@ -49,8 +52,19 @@ function computeSavePercent(monthlyPkg: PurchasesPackage, annualPkg: PurchasesPa
     }
 }
 
+function formatMonthlyEquivalent(annualPkg: PurchasesPackage): string {
+    try {
+        const price = annualPkg.product.price / 12;
+        const currencyCode = (annualPkg.product as any).currencyCode ?? 'USD';
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price);
+    } catch {
+        return annualPkg.product.priceString;
+    }
+}
+
 export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
     const { t } = useSettings();
+    const posthog = usePostHog();
     const { purchasePackage, restorePurchases, isPro } = useRevenueCat();
 
     const [packages, setPackages] = useState<PurchasesPackage[]>([]);
@@ -86,6 +100,12 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
     }, [loadOfferings]);
 
     useEffect(() => {
+        if (posthog) {
+            posthog.capture('paywall_viewed');
+        }
+    }, [posthog]);
+
+    useEffect(() => {
         if (isPro) {
             navigation.goBack();
         }
@@ -93,6 +113,9 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
 
     const handlePurchase = async () => {
         if (!selectedPackage || isPurchasing) return;
+        if (posthog) {
+            posthog.capture('trial_button_clicked');
+        }
         setIsPurchasing(true);
         try {
             await purchasePackage(selectedPackage);
@@ -118,6 +141,18 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
         }
     };
 
+    const handleRedeemCode = () => {
+        if (Platform.OS !== 'ios') return;
+        try {
+            const anyPurchases = Purchases as any;
+            if (typeof anyPurchases.presentCodeRedemptionSheet === 'function') {
+                anyPurchases.presentCodeRedemptionSheet();
+            }
+        } catch (e) {
+            console.warn('Redeem code sheet error', e);
+        }
+    };
+
     const openTerms = () => navigation.navigate('TermsOfUse');
     const openPrivacy = () => navigation.navigate('PrivacyPolicy');
 
@@ -131,10 +166,15 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
                 >
                     <X color={Colors.textSecondary} size={26} />
                 </TouchableOpacity>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardAvoid}
+                >
                 <ScrollView
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.header}>
                         <View style={styles.iconWrap}>
@@ -164,76 +204,68 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
                             </MysticalText>
                         </View>
                     ) : (
-                        <View style={styles.cards}>
-                            {monthlyPackage && (
-                                <TouchableOpacity
-                                    activeOpacity={0.9}
-                                    onPress={() => setSelectedPackage(monthlyPackage)}
-                                    style={styles.cardTouch}
-                                >
-                                    <GlassCard
-                                        border
-                                        style={[
-                                            styles.packageCard,
-                                            selectedPackage?.identifier === monthlyPackage.identifier && styles.packageCardSelected,
-                                        ]}
+                        <>
+                            <MysticalText variant="body" style={styles.tryFreeCopy}>
+                                {t('paywallTryFreeThen')}
+                            </MysticalText>
+                            <View style={styles.cardsRow}>
+                                {monthlyPackage && (
+                                    <TouchableOpacity
+                                        activeOpacity={0.9}
+                                        onPress={() => setSelectedPackage(monthlyPackage)}
+                                        style={styles.cardColumn}
                                     >
-                                        <View style={styles.packageHeader}>
+                                        <GlassCard
+                                            border
+                                            style={[
+                                                styles.packageCard,
+                                                styles.packageCardMonthly,
+                                                selectedPackage?.identifier === monthlyPackage.identifier && styles.packageCardSelected,
+                                            ]}
+                                        >
                                             <MysticalText variant="h2" style={styles.packageTitle}>
                                                 {t('paywallMonthly')}
                                             </MysticalText>
                                             <MysticalText variant="body" style={styles.packagePrice}>
                                                 {monthlyPackage.product.priceString}
-                                                <MysticalText variant="caption" style={styles.perMonth}>/month</MysticalText>
+                                                <MysticalText variant="caption" style={styles.perMonth}> /mo</MysticalText>
                                             </MysticalText>
-                                        </View>
-                                    </GlassCard>
-                                </TouchableOpacity>
-                            )}
-
-                            {annualPackage && (
-                                <TouchableOpacity
-                                    activeOpacity={0.9}
-                                    onPress={() => setSelectedPackage(annualPackage)}
-                                    style={styles.cardTouch}
-                                >
-                                    <GlassCard
-                                        border
-                                        style={[
-                                            styles.packageCard,
-                                            styles.packageCardYearly,
-                                            selectedPackage?.identifier === annualPackage.identifier && styles.packageCardSelected,
-                                        ]}
+                                        </GlassCard>
+                                    </TouchableOpacity>
+                                )}
+                                {annualPackage && (
+                                    <TouchableOpacity
+                                        activeOpacity={0.9}
+                                        onPress={() => setSelectedPackage(annualPackage)}
+                                        style={styles.cardColumn}
                                     >
-                                        <View style={styles.badge}>
-                                            <MysticalText variant="caption" style={styles.badgeText}>
-                                                {savePercent != null && savePercent > 0
-                                                    ? `${t('paywallBestValue')} · ${t('paywallSavePercent').replace('{{n}}', String(savePercent))}`
-                                                    : t('paywallBestValue')}
-                                            </MysticalText>
-                                        </View>
-                                        <View style={styles.packageHeader}>
+                                        <GlassCard
+                                            border
+                                            style={[
+                                                styles.packageCard,
+                                                styles.packageCardYearly,
+                                                selectedPackage?.identifier === annualPackage.identifier && styles.packageCardSelected,
+                                            ]}
+                                        >
                                             <MysticalText variant="h2" style={styles.packageTitle}>
                                                 {t('paywallYearly')}
                                             </MysticalText>
-                                            <MysticalText variant="body" style={styles.packagePrice}>
-                                                {annualPackage.product.priceString}
-                                                <MysticalText variant="caption" style={styles.perMonth}>/year</MysticalText>
+                                            <MysticalText variant="body" style={styles.priceMonthlyEquiv}>
+                                                Only {formatMonthlyEquivalent(annualPackage)} /month
                                             </MysticalText>
-                                        </View>
-                                        <MysticalText variant="caption" style={styles.billedAnnually}>
-                                            {t('paywallBilledAnnuallyAt').replace('{{price}}', annualPackage.product.priceString)}
-                                        </MysticalText>
-                                    </GlassCard>
-                                </TouchableOpacity>
-                            )}
-
+                                            <MysticalText variant="caption" style={styles.billedAnnually}>
+                                                {t('paywallBilledAnnuallyAt').replace('{{price}}', annualPackage.product.priceString)}
+                                            </MysticalText>
+                                        </GlassCard>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
                             {packages.length === 0 && !loadingOfferings && (
                                 <MysticalText variant="body" style={styles.noPackages}>
                                     No subscription options available.
                                 </MysticalText>
                             )}
-                        </View>
+                        </>
                     )}
 
                     <TouchableOpacity
@@ -246,10 +278,22 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
                             <ActivityIndicator color={Colors.background} size="small" />
                         ) : (
                             <MysticalText variant="h2" style={styles.ctaText}>
-                                {t('paywallUnlockNow')}
+                                {t('paywallCtaTryFree')}
                             </MysticalText>
                         )}
                     </TouchableOpacity>
+
+                    {Platform.OS === "ios" && (
+                        <TouchableOpacity
+                            style={styles.redeemCodeButton}
+                            onPress={handleRedeemCode}
+                            activeOpacity={0.85}
+                        >
+                            <MysticalText variant="caption" style={styles.redeemCodeText}>
+                                {t("paywallRedeemCode")}
+                            </MysticalText>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.footer}>
                         <TouchableOpacity onPress={handleRestore} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -271,6 +315,7 @@ export const PaywallScreen: React.FC<Props> = ({ navigation }) => {
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
+                </KeyboardAvoidingView>
             </SafeAreaView>
         </GradientBackground>
     );
@@ -330,6 +375,11 @@ const styles = StyleSheet.create({
         color: Colors.text,
         flex: 1,
     },
+    tryFreeCopy: {
+        color: Colors.primary,
+        textAlign: 'center',
+        marginBottom: 16,
+    },
     loadingBox: {
         alignItems: 'center',
         paddingVertical: 40,
@@ -338,54 +388,70 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
         marginTop: 12,
     },
-    cards: {
-        gap: 14,
-        marginBottom: 28,
+    keyboardAvoid: {
+        flex: 1,
     },
-    cardTouch: {
-        marginBottom: 4,
+    cardsRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        gap: 12,
+        marginBottom: 16,
+    },
+    cardColumn: {
+        flex: 1,
     },
     packageCard: {
-        opacity: 0.85,
+        flex: 1,
+        opacity: 0.9,
         borderWidth: 1.5,
         borderColor: 'rgba(255,255,255,0.08)',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+    },
+    packageCardMonthly: {
+        justifyContent: 'flex-start',
     },
     packageCardYearly: {
-        borderColor: 'rgba(212, 175, 55, 0.25)',
+        borderColor: 'rgba(212, 175, 55, 0.35)',
+        borderWidth: 1.5,
+        backgroundColor: 'rgba(212, 175, 55, 0.06)',
+        justifyContent: 'space-between',
     },
     packageCardSelected: {
         opacity: 1,
         borderColor: Colors.primary,
-        borderWidth: 2,
+        borderWidth: 2.5,
         shadowColor: Colors.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
+        shadowOpacity: 0.45,
+        shadowRadius: 14,
         elevation: 12,
     },
     badge: {
         alignSelf: 'flex-start',
-        backgroundColor: 'rgba(212, 175, 55, 0.2)',
-        paddingHorizontal: 10,
+        backgroundColor: 'rgba(212, 175, 55, 0.25)',
+        paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 8,
         marginBottom: 10,
     },
     badgeText: {
         color: Colors.primary,
-        fontWeight: '600',
-    },
-    packageHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        fontWeight: '700',
+        fontSize: 11,
     },
     packageTitle: {
         color: Colors.text,
+        marginBottom: 4,
     },
     packagePrice: {
         color: Colors.primary,
         fontWeight: '600',
+    },
+    priceMonthlyEquiv: {
+        color: Colors.primary,
+        fontWeight: '700',
+        marginTop: 4,
     },
     perMonth: {
         color: Colors.textSecondary,
@@ -393,7 +459,8 @@ const styles = StyleSheet.create({
     },
     billedAnnually: {
         color: Colors.textSecondary,
-        marginTop: 8,
+        marginTop: 6,
+        fontSize: 12,
     },
     noPackages: {
         color: Colors.textSecondary,
@@ -410,6 +477,16 @@ const styles = StyleSheet.create({
     },
     ctaDisabled: {
         opacity: 0.8,
+    },
+    redeemCodeButton: {
+        marginTop: 12,
+        marginBottom: 4,
+        alignItems: 'center',
+    },
+    redeemCodeText: {
+        color: Colors.textSecondary,
+        textDecorationLine: 'underline',
+        opacity: 0.9,
     },
     ctaText: {
         color: Colors.background,

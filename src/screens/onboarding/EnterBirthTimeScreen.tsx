@@ -9,6 +9,7 @@ import { Clock } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { usePostHog } from 'posthog-react-native';
 import { localeForLanguage } from '../../utils/translations';
 
 interface EnterBirthTimeScreenProps {
@@ -24,7 +25,15 @@ function formatTimeToHHmm(date: Date): string {
 
 export const EnterBirthTimeScreen: React.FC<EnterBirthTimeScreenProps> = ({ onContinue, onBack }) => {
     const { t, language } = useSettings();
+    const posthog = usePostHog();
     const [time, setTime] = useState(new Date(2000, 0, 1, 12, 0, 0));
+
+    const handleContinue = () => {
+        if (posthog) {
+            posthog.capture('onboarding_step_completed', { step_name: 'enter_birth_time', step_number: 6 });
+        }
+        onContinue(formatTimeToHHmm(time));
+    };
 
     const onChange = (_event: any, selectedDate?: Date) => {
         if (selectedDate) setTime(selectedDate);
@@ -35,7 +44,7 @@ export const EnterBirthTimeScreen: React.FC<EnterBirthTimeScreenProps> = ({ onCo
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={4} totalSteps={10} onBack={onBack} />
+            <OnboardingHeader step={4} totalSteps={11} onBack={onBack} />
 
             <View style={styles.header}>
                 <MysticalText variant="h1" style={styles.title}>
@@ -69,7 +78,7 @@ export const EnterBirthTimeScreen: React.FC<EnterBirthTimeScreenProps> = ({ onCo
             <View style={styles.footer}>
                 <Button
                     title={t('continue')}
-                    onPress={() => onContinue(formatTimeToHHmm(time))}
+                    onPress={handleContinue}
                 />
             </View>
         </GradientBackground>
@@ -79,7 +88,6 @@ export const EnterBirthTimeScreen: React.FC<EnterBirthTimeScreenProps> = ({ onCo
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 25,
-        paddingTop: 60,
         paddingBottom: 50,
     },
     header: {
