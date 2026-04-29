@@ -6,6 +6,7 @@ import { Colors } from '../../constants/Colors';
 import { NumerologyEngine } from '../../utils/numerology';
 import { AIService } from '../../services/ai';
 import { useUser } from '../../context/UserContext';
+import { clearOnboardingResume } from '../../utils/onboardingResumeStorage';
 import { useSettings } from '../../context/SettingsContext';
 
 interface CalculatingScreenProps {
@@ -71,7 +72,6 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
                         identity: userData.identity,
                         focus: userData.focus,
                         challenge: userData.challenge,
-                        relationshipStatus: userData.relationshipStatus,
                     });
                 } catch (aiError) {
                     console.error('AI Reading Error:', aiError);
@@ -92,6 +92,7 @@ export const CalculatingScreen: React.FC<CalculatingScreenProps> = ({ userData, 
                 try {
                     await saveUserProfile(userData);
                     await saveNumerologyResults(results);
+                    await clearOnboardingResume();
                 } catch (saveError) {
                     console.error('Data Save Error:', saveError);
                 }

@@ -1,21 +1,19 @@
 export type RootStackParamList = {
     Splash: undefined;
     Settings: undefined;
-    Paywall: undefined;
+    Paywall: { variant?: 'onboarding' };
     Welcome: undefined;
+    OnboardingFlow: undefined;
     Language: undefined;
-    Identity: undefined;
     Name: undefined;
+    Identity: undefined;
     Birthdate: undefined;
-    PlaceOfBirth: undefined;
-    AIConsent: { userData: any };
-    Calculating: { userData: any };
-    BirthTime: undefined;
-    EnterBirthTime: undefined;
-    Relationship: undefined;
     Focus: undefined;
     Challenge: undefined;
-    Expectations: undefined;
+    AIConsent: { userData: any };
+    LoadingAnalysis: undefined;
+    Analysis: undefined;
+    Calculating: { userData: any };
     AnalysisComplete: {
         reading: string;
         lifePath: number | string;
@@ -62,7 +60,7 @@ export type MainTabParamList = {
         lifePath: number | string;
         language: string;
     };
-    Map: undefined;
+    Forecast: undefined;
     Profile: {
         name: string;
         reading: string;

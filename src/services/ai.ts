@@ -20,6 +20,10 @@ const callProxy = async (prompt: string) => {
     if (!APP_SECRET && __DEV__) {
         console.warn('[AI] EXPO_PUBLIC_APP_SECRET is not set. Add it to .env (see .env.example). Edge function will reject requests.');
     }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
     try {
         const response = await fetch(EDGE_FUNCTION_URL, {
             method: 'POST',
@@ -29,23 +33,37 @@ const callProxy = async (prompt: string) => {
                 'X-App-Secret': APP_SECRET,
             },
             body: JSON.stringify({ prompt }),
+            signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error('Network response was not ok');
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errBody = await response.json().catch(() => ({}));
+            throw new Error(errBody.error || `Network response was not ok (${response.status})`);
+        }
 
         const dataResponse = await response.json();
+        
+        if (dataResponse.text === 'Error') {
+            throw new Error(dataResponse.details || 'Unknown proxy error');
+        }
+
         return dataResponse.text;
-    } catch (error) {
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out after 15 seconds');
+        }
         throw error;
     }
 };
 
 /** Optional personalization context for prompts (from onboarding) */
 export type PersonalizationContext = {
-    identity?: string;           // e.g. Male, Female, Non-binary, Prefer not to say
-    focus?: string;              // e.g. career, love, spiritual, health
-    challenge?: string;          // e.g. purpose, relationships, career, confidence, balance
-    relationshipStatus?: string; // e.g. single, relationship, married, complicated, private
+    identity?: string;  // e.g. male, female, non-binary, private
+    focus?: string;     // e.g. career, love, spiritual, health
+    challenge?: string; // e.g. purpose, relationships, career, confidence, balance
 };
 
 export const AIService = {
@@ -63,14 +81,12 @@ export const AIService = {
         identity?: string;
         focus?: string;
         challenge?: string;
-        relationshipStatus?: string;
     }) => {
         try {
             const lang = data.language || 'English';
             const identity = data.identity || '';
             const focus = data.focus || '';
             const challenge = data.challenge || '';
-            const relationshipStatus = data.relationshipStatus || '';
 
             const prompt = `You are an expert mystical numerologist. Write a personalized numerology reading.
 
@@ -84,20 +100,15 @@ CORE DATA:
 ${identity ? `- Gender/Identity: ${identity}` : ''}
 ${focus ? `- Main focus in life: ${focus}` : ''}
 ${challenge ? `- Current challenge: ${challenge}` : ''}
-${relationshipStatus ? `- Relationship status: ${relationshipStatus}` : ''}
 
 LANGUAGE & GENDER STRICT RULE:
 - You MUST respond entirely in the language: ${lang}. Use English only if "${lang}" is not specified or as fallback.
 - If the target language has gendered grammar (e.g. Hebrew, Spanish, French), you MUST conjugate all verbs, adjectives, and pronouns to match the user's gender/identity: "${identity || 'neutral/unknown'}". Do not use a default gender; use the one provided.
 
 DEEP PERSONALIZATION:
-- Do not simply list the user's focus, challenge, or relationship status. Weave them organically into the numerology interpretation.
+- Do not simply list the user's focus or challenge. Weave them organically into the numerology interpretation.
 - Explain how their Life Path, Destiny, Soul Urge, or Personality number gives them tools or strengths to overcome their specific challenge (${challenge || 'their current obstacles'}) and move toward their focus (${focus || 'their goals'}).
 - Make the reading feel written for this person, not generic.
-
-CONTEXTUAL NUANCE:
-- Adjust the tone and advice based on relationship status (${relationshipStatus || 'not specified'}).
-- For example: advice for a single person seeking love should differ from someone in a committed relationship; someone "married" or "in a relationship" may benefit from different emphasis than someone "single" or "prefer not to say."
 
 OUTPUT:
 - Provide a short (2-3 paragraphs) mystical, inspiring reading. Keep the tone elegant, high-end, and profound.
@@ -123,12 +134,11 @@ OUTPUT:
             const identity = context?.identity || '';
             const focus = context?.focus || '';
             const challenge = context?.challenge || '';
-            const relationshipStatus = context?.relationshipStatus || '';
 
             const prompt = `You are the AI Oracle of Echoes: Numerology Map.
 A seeker with Life Path ${lifePath} asks: "${question}"
 ${identity ? `Seeker's gender/identity (use for grammar in gendered languages): ${identity}.` : ''}
-${focus || challenge || relationshipStatus ? `Additional context (weave into the answer where relevant): focus=${focus || '—'}, challenge=${challenge || '—'}, relationship=${relationshipStatus || '—'}.` : ''}
+${focus || challenge ? `Additional context (weave into the answer where relevant): focus=${focus || '—'}, challenge=${challenge || '—'}.` : ''}
 
 LANGUAGE & GENDER RULE: Respond entirely in the language: ${language}. If that language has gendered grammar (e.g. Hebrew, Spanish), conjugate all verbs, adjectives, and pronouns to match the seeker's identity: "${identity || 'neutral/unknown'}".
 
@@ -154,12 +164,10 @@ If the response language is Hebrew (or RTL), ensure punctuation is compatible wi
         try {
             const partnerLP = NumerologyEngine.calculateLifePath(partnerBirthdate);
             const identity = context?.identity || '';
-            const relationshipStatus = context?.relationshipStatus || '';
 
             const prompt = `Analyze the numerological compatibility between two souls:
 Person 1 Life Path: ${userLifePath}
 Person 2 Life Path: ${partnerLP}
-${relationshipStatus ? `Person 1's current relationship context: ${relationshipStatus}. Use this to nuance your advice (e.g. single vs. in a relationship).` : ''}
 
 LANGUAGE & GENDER RULE: Respond entirely in the language: ${language}. If that language has gendered grammar, conjugate to match the user's identity: "${identity || 'neutral/unknown'}".
 
@@ -292,14 +300,16 @@ RULES:
     getDailyInsight: async (
         lifePath: number | string,
         language: string = 'English',
-        context?: Pick<PersonalizationContext, 'identity'>
-    ) => {
+        context?: Pick<PersonalizationContext, 'identity' | 'focus'>
+    ): Promise<string | null> => {
         try {
             const identity = context?.identity || '';
+            const focus = context?.focus || '';
             const prompt = `You are a mystical numerologist. For a seeker with Life Path ${lifePath}, provide today's daily insight.
 
 RESPONSE LANGUAGE: ${language}.
 ${identity ? `Use grammar that matches the seeker's identity (${identity}) if the language is gendered.` : ''}
+${focus ? `FOCUS AREA: Tailor the message to this life focus: ${focus}.` : ''}
 
 You MUST respond with ONLY a valid JSON object—no markdown, no code fences, no extra text.
 
@@ -321,7 +331,7 @@ RULES:
             return await callProxy(prompt);
         } catch (error) {
             handleError(error);
-            return "Trust your intuition today.";
+            return null;
         }
     }
 };

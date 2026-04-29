@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Pressable } from 'react-native';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
 import { Colors } from '../../constants/Colors';
 import { MysticalText } from '../ui/MysticalText';
@@ -13,19 +14,21 @@ interface OnboardingHeaderProps {
 
 export const OnboardingHeader: React.FC<OnboardingHeaderProps> = ({ step, totalSteps, onBack }) => {
     const { t } = useSettings();
+    const insets = useSafeAreaInsets();
     const progress = (step / totalSteps) * 100;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
             <View style={styles.topRow}>
                 {onBack ? (
-                    <Pressable
+                    <TouchableOpacity
                         onPress={onBack}
-                        style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-                        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                        style={styles.backBtn}
+                        hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+                        activeOpacity={0.6}
                     >
                         <ChevronLeft color={Colors.primary} size={28} />
-                    </Pressable>
+                    </TouchableOpacity>
                 ) : (
                     <View style={styles.backBtn} />
                 )}
@@ -49,8 +52,7 @@ const styles = StyleSheet.create({
     container: {
         width: '100%',
         paddingHorizontal: 25,
-        paddingTop: 60,
-        marginBottom: 30,
+        marginBottom: 20,
     },
     topRow: {
         flexDirection: 'row',
@@ -61,8 +63,10 @@ const styles = StyleSheet.create({
     backBtn: {
         minWidth: 44,
         minHeight: 44,
+        padding: 15,
         justifyContent: 'center',
         alignItems: 'flex-start',
+        marginLeft: -15, // Offset the padding so the icon still aligns to the left edge
     },
     stepText: {
         fontWeight: '700',

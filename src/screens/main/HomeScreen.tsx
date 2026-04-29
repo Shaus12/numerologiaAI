@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Share as RNShare } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Share as RNShare, Modal, Animated, Dimensions, Pressable, LayoutChangeEvent } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
@@ -8,15 +8,27 @@ import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { MainTabParamList, RootStackParamList } from '../../navigation/types';
-import { Sparkles, ChevronRight, BookOpen, Share2, Lock } from 'lucide-react-native';
+import { Sparkles, ChevronRight, BookOpen, Share2, Lock, Briefcase, Heart, Zap, MessageCircle, Users, LayoutGrid, Phone, Home, Type, Calendar, Info, X, Moon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AIService } from '../../services/ai';
-import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useUser } from '../../context/UserContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { localeForLanguage } from '../../utils/translations';
-import { requestNotificationPermissions, scheduleDailyMorningReminder } from '../../utils/notifications';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+    requestNotificationPermissions,
+    scheduleDailyMorningReminder,
+    scheduleDailyMorningReminderIfGranted,
+} from '../../utils/notifications';
+import {
+    buildLifePathFallbackInsight,
+    loadTodayOracleInsight,
+    saveTodayOracleInsight,
+} from '../../utils/dailyOracleStorage';
+
+/** Only show the OS notification prompt once, on the user's first visit to Home (e.g. after analysis → MainTabs). */
+const NOTIFICATION_FIRST_HOME_PROMPT_KEY = 'notification_first_home_prompt_v1';
 import { dailyNumberForGuide } from '../../data/dailyActionGuide';
 
 export type DailyInsightData = {
@@ -141,6 +153,15 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     const hasStoredReading = Boolean(numerologyResults?.reading?.trim());
     const parentNav = navigation.getParent() as any;
 
+    // ── Walkthrough ──────────────────────────────────────────────────────────
+    const WALKTHROUGH_KEY = 'home_walkthrough_v2';
+    const [walkthroughStep, setWalkthroughStep] = React.useState(0);
+    const [guideCardY, setGuideCardY] = React.useState(0);
+    const pulseAnim = React.useRef(new Animated.Value(1)).current;
+    const guideGlowAnim = React.useRef(new Animated.Value(0)).current;
+    const insets = useSafeAreaInsets();
+    const SCREEN_W = Dimensions.get('window').width;
+
     const onAnalysisCardPress = () => {
         if (!hasStoredReading) return;
         const parent = navigation.getParent();
@@ -174,10 +195,12 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         luckyColor: '—',
     }));
     const [loadingInsight, setLoadingInsight] = React.useState(true);
+    const moonSpin = React.useRef(new Animated.Value(0)).current;
 
     const [dailyGuide, setDailyGuide] = React.useState<DailyActionGuideData | null>(null);
     const [loadingGuide, setLoadingGuide] = React.useState(true);
     const scrollViewRef = React.useRef<ScrollView>(null);
+    const [showToolkitInfo, setShowToolkitInfo] = React.useState(false);
 
     React.useEffect(() => {
         if (route.params?.openDailyInsight) {
@@ -185,50 +208,193 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         }
     }, [route.params?.openDailyInsight]);
 
-    // Request notification permission and schedule daily morning reminder after user is on Home (past splash/onboarding)
+    // First visit to Home only: OS notification prompt (typically right after analysis → dashboard).
+    // Later visits / language changes: reschedule reminder only if permission already granted.
     React.useEffect(() => {
+        let cancelled = false;
         const timer = setTimeout(async () => {
             try {
-                const granted = await requestNotificationPermissions();
-                if (granted) {
-                    await scheduleDailyMorningReminder(language);
-                }
-            } catch (e) {
-                // Ignore; permission or scheduling can fail on simulators or if user denies
-            }
-        }, 1800);
-        return () => clearTimeout(timer);
-    }, [language]);
+                if (cancelled) return;
 
-    React.useEffect(() => {
-        const fetchInsight = async () => {
-            const todayKey = new Date().toISOString().split('T')[0];
-            const cacheKey = `daily_insight_${lifePath}_${language}_${todayKey}`;
-
-            try {
-                // Check cache first
-                const cached = await AsyncStorage.getItem(cacheKey);
-                if (cached) {
-                    setDailyInsight(parseDailyInsight(cached));
-                    setLoadingInsight(false);
+                // Paying subscribers use the 08:30 subscriber-journey stack only — never reschedule generic 08:00 here.
+                if (isPro) {
+                    const prompted = await AsyncStorage.getItem(NOTIFICATION_FIRST_HOME_PROMPT_KEY);
+                    if (prompted !== '1' && !cancelled) {
+                        await AsyncStorage.setItem(NOTIFICATION_FIRST_HOME_PROMPT_KEY, '1');
+                    }
                     return;
                 }
 
-                // If not cached, fetch from AI
-                const insight = await AIService.getDailyInsight(lifePath, language, userProfile?.identity ? { identity: userProfile.identity } : undefined);
-                if (insight) {
-                    const parsed = parseDailyInsight(insight);
-                    setDailyInsight(parsed);
-                    await AsyncStorage.setItem(cacheKey, insight);
+                const alreadyPrompted = await AsyncStorage.getItem(NOTIFICATION_FIRST_HOME_PROMPT_KEY);
+                if (cancelled) return;
+                if (alreadyPrompted === '1') {
+                    await scheduleDailyMorningReminderIfGranted(language);
+                    return;
                 }
-            } catch (error) {
-                console.error('Insight fetch error:', error);
-            } finally {
-                setLoadingInsight(false);
+                const granted = await requestNotificationPermissions();
+                if (!cancelled) {
+                    await AsyncStorage.setItem(NOTIFICATION_FIRST_HOME_PROMPT_KEY, '1');
+                }
+                if (granted && !cancelled) {
+                    await scheduleDailyMorningReminder(language);
+                }
+            } catch {
+                try {
+                    await AsyncStorage.setItem(NOTIFICATION_FIRST_HOME_PROMPT_KEY, '1');
+                } catch (_) {}
             }
+        }, 1800);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
         };
-        fetchInsight();
-    }, [lifePath, language]);
+    }, [language, isPro]);
+
+    React.useEffect(() => {
+        AsyncStorage.getItem(WALKTHROUGH_KEY)
+            .then(done => { if (!done) setTimeout(() => setWalkthroughStep(1), 900); })
+            .catch(() => {});
+    }, []);
+
+    React.useEffect(() => {
+        if (walkthroughStep === 2 || walkthroughStep === 3) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, { toValue: 1.45, duration: 750, useNativeDriver: true }),
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 750, useNativeDriver: true }),
+                ])
+            ).start();
+        } else {
+            pulseAnim.stopAnimation?.();
+            pulseAnim.setValue(1);
+        }
+    }, [walkthroughStep]);
+
+    React.useEffect(() => {
+        if (walkthroughStep === 1) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(guideGlowAnim, { toValue: 1, duration: 850, useNativeDriver: true }),
+                    Animated.timing(guideGlowAnim, { toValue: 0.2, duration: 850, useNativeDriver: true }),
+                ])
+            ).start();
+        } else {
+            guideGlowAnim.stopAnimation?.();
+            guideGlowAnim.setValue(0);
+        }
+    }, [walkthroughStep, guideGlowAnim]);
+
+    /** Scroll Daily Action Guide into view when step 1 opens */
+    React.useEffect(() => {
+        if (walkthroughStep !== 1) return;
+        const scrollToGuide = () => {
+            const y = guideCardY > 0 ? Math.max(0, guideCardY - 12) : 260;
+            scrollViewRef.current?.scrollTo({ y, animated: true });
+        };
+        const t1 = setTimeout(scrollToGuide, 400);
+        const t2 = setTimeout(scrollToGuide, 1100);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
+    }, [walkthroughStep, guideCardY]);
+
+    const onGuideCardLayout = React.useCallback((e: LayoutChangeEvent) => {
+        setGuideCardY(e.nativeEvent.layout.y);
+    }, []);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            let active = true;
+            setLoadingInsight(true);
+
+            const runMoonSpinner = Animated.loop(
+                Animated.timing(moonSpin, {
+                    toValue: 1,
+                    duration: 3200,
+                    useNativeDriver: true,
+                }),
+            );
+            moonSpin.setValue(0);
+            runMoonSpinner.start();
+
+            const fetchInsight = async () => {
+                try {
+                    const focusArea = userProfile?.focus ?? '';
+
+                    const cached = await loadTodayOracleInsight({
+                        lifePath,
+                        language,
+                        focusArea,
+                    });
+                    if (cached?.cosmicMessage) {
+                        if (!active) return;
+                        setDailyInsight(cached);
+                        setLoadingInsight(false);
+                        return;
+                    }
+
+                    const live = await AIService.getDailyInsight(
+                        lifePath,
+                        language,
+                        {
+                            identity: userProfile?.identity,
+                            focus: focusArea,
+                        },
+                    );
+
+                    if (live) {
+                        const parsed = parseDailyInsight(live);
+                        if (parsed.cosmicMessage) {
+                            await saveTodayOracleInsight(
+                                { lifePath, language, focusArea },
+                                parsed,
+                                'ai',
+                            );
+                            if (!active) return;
+                            setDailyInsight(parsed);
+                            setLoadingInsight(false);
+                            return;
+                        }
+                    }
+
+                    const hardFallback = buildLifePathFallbackInsight(lifePath, focusArea);
+                    await saveTodayOracleInsight(
+                        { lifePath, language, focusArea },
+                        hardFallback,
+                        'life-path-fallback',
+                    );
+                    if (!active) return;
+                    setDailyInsight(hardFallback);
+                } catch (error) {
+                    console.error('Daily Oracle fallback error:', error);
+                    const hardFallback = buildLifePathFallbackInsight(lifePath, userProfile?.focus);
+                    try {
+                        await saveTodayOracleInsight(
+                            { lifePath, language, focusArea: userProfile?.focus },
+                            hardFallback,
+                            'life-path-fallback',
+                        );
+                    } catch {
+                        // noop: best-effort cache write
+                    }
+                    if (!active) return;
+                    setDailyInsight(hardFallback);
+                } finally {
+                    if (!active) return;
+                    setLoadingInsight(false);
+                }
+            };
+
+            fetchInsight();
+
+            return () => {
+                active = false;
+                runMoonSpinner.stop();
+                moonSpin.stopAnimation();
+            };
+        }, [lifePath, language, moonSpin, userProfile?.focus, userProfile?.identity]),
+    );
 
     React.useEffect(() => {
         if (!userProfile?.birthdate) {
@@ -264,6 +430,12 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
         fetchGuide();
     }, [userProfile?.birthdate, language]);
 
+    const dismissWalkthrough = () => {
+        setWalkthroughStep(0);
+        AsyncStorage.setItem(WALKTHROUGH_KEY, 'true').catch(() => {});
+    };
+    const advanceWalkthrough = () => setWalkthroughStep((s) => (s < 3 ? s + 1 : s));
+
     const today = new Date();
     const locale = localeForLanguage[language as keyof typeof localeForLanguage] || 'en-US';
     const formattedDate = today.toLocaleDateString(locale, {
@@ -273,6 +445,7 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
     });
 
     return (
+        <>
         <GradientBackground>
             <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
                 <ScrollView
@@ -311,8 +484,29 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                             </TouchableOpacity>
                         </View>
                         <MysticalText variant="body" style={styles.cosmicContent}>
-                            {loadingInsight ? t('consultingStars') : dailyInsight.cosmicMessage}
+                            {loadingInsight ? '' : dailyInsight.cosmicMessage}
                         </MysticalText>
+                        {loadingInsight && (
+                            <View style={styles.oracleLoadingWrap}>
+                                <Animated.View
+                                    style={{
+                                        transform: [
+                                            {
+                                                rotate: moonSpin.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: ['0deg', '360deg'],
+                                                }),
+                                            },
+                                        ],
+                                    }}
+                                >
+                                    <Moon color={Colors.primary} size={24} />
+                                </Animated.View>
+                                <MysticalText style={styles.oracleLoadingText}>
+                                    האורקל מתחבר לאנרגיה שלך...
+                                </MysticalText>
+                            </View>
+                        )}
                     </GlassCard>
 
                     {/* Daily Action Guide – full for Pro, teaser for free */}
@@ -324,75 +518,169 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                         const relationships = loadingGuide ? '' : (dailyGuide?.relationships ?? '');
                         const action = loadingGuide ? '' : (dailyGuide?.action ?? '');
 
-                        if (isPro) {
-                            return (
-                                <GlassCard style={styles.dailyGuideCard}>
-                                    <View style={styles.dailyGuideHeader}>
-                                        <Sparkles color={Colors.primary} size={16} />
-                                        <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
-                                        <View style={styles.dailyGuideBadge}>
-                                            <MysticalText style={styles.dailyGuideBadgeText}>{guideDisplayNumber}</MysticalText>
-                                        </View>
-                                    </View>
-                                    <MysticalText variant="body" style={styles.dailyGuideTheme}>{theme}</MysticalText>
-                                    <View style={styles.dailyGuideSection}>
-                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideText}>{career}</MysticalText>
-                                    </View>
-                                    <View style={styles.dailyGuideSection}>
-                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideText}>{relationships}</MysticalText>
-                                    </View>
-                                    <View style={[styles.dailyGuideSection, styles.dailyGuideActionWrap]}>
-                                        <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
-                                        <MysticalText variant="body" style={styles.dailyGuideActionText}>{action}</MysticalText>
-                                    </View>
-                                </GlassCard>
-                            );
-                        }
+                        const VaultCtaInGuide = () => (
+                            <TouchableOpacity
+                                style={[styles.ctaBanner, styles.ctaInGuide]}
+                                onPress={() => navigation.navigate('Vault')}
+                                activeOpacity={0.75}
+                            >
+                                <View style={[styles.ctaIconCircle, { backgroundColor: 'rgba(52,211,153,0.15)' }]}>
+                                    <Users color="#34d399" size={18} />
+                                </View>
+                                <View style={styles.ctaBody}>
+                                    <MysticalText style={styles.ctaQuestion}>{t('ctaVaultQuestion')}</MysticalText>
+                                    <MysticalText style={[styles.ctaAction, { color: '#34d399' }]}>{t('ctaVaultAction')} →</MysticalText>
+                                </View>
+                                <ChevronRight color="rgba(255,255,255,0.2)" size={16} />
+                            </TouchableOpacity>
+                        );
 
-                        return (
-                            <GlassCard style={styles.dailyGuideCard}>
-                                <View style={styles.dailyGuideHeader}>
-                                    <Sparkles color={Colors.primary} size={16} />
-                                    <MysticalText variant="subtitle" style={styles.dailyGuideTitle}>{t('dailyActionGuide')}</MysticalText>
-                                    <View style={styles.dailyGuideBadge}>
-                                        <MysticalText style={styles.dailyGuideBadgeText}>{guideDisplayNumber}</MysticalText>
+                        const OracleCtaInGuide = () => (
+                            <TouchableOpacity
+                                style={[styles.ctaBanner, styles.ctaInGuide, styles.ctaInGuideLast]}
+                                onPress={() => navigation.navigate('Oracle', { lifePath, language })}
+                                activeOpacity={0.75}
+                            >
+                                <View style={[styles.ctaIconCircle, { backgroundColor: 'rgba(155,89,182,0.18)' }]}>
+                                    <MessageCircle color={Colors.secondary} size={18} />
+                                </View>
+                                <View style={styles.ctaBody}>
+                                    <MysticalText style={styles.ctaQuestion}>{t('ctaOracleQuestion')}</MysticalText>
+                                    <MysticalText style={[styles.ctaAction, { color: Colors.secondary }]}>{t('ctaOracleAction')} →</MysticalText>
+                                </View>
+                                <ChevronRight color="rgba(255,255,255,0.2)" size={16} />
+                            </TouchableOpacity>
+                        );
+
+                        const GuideBody = ({ embedCtas }: { embedCtas: boolean }) => (
+                            <>
+                                {/* Career */}
+                                <View style={styles.guideSection}>
+                                    <View style={[styles.guideSectionIcon, { backgroundColor: 'rgba(155,89,182,0.15)' }]}>
+                                        <Briefcase color={Colors.secondary} size={18} />
+                                    </View>
+                                    <View style={styles.guideSectionBody}>
+                                        <MysticalText style={styles.guideSectionLabel}>{t('dailyActionGuideCareer')}</MysticalText>
+                                        <MysticalText style={styles.guideSectionText}>{career}</MysticalText>
                                     </View>
                                 </View>
-                                <MysticalText variant="body" style={styles.dailyGuideTheme}>{theme}</MysticalText>
-                                <TouchableOpacity
-                                    style={styles.dailyGuideTeaserWrap}
-                                    onPress={openPaywall}
-                                    activeOpacity={1}
-                                >
-                                    <View style={styles.dailyGuideTeaserContent}>
-                                        <View style={styles.dailyGuideSection}>
-                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideCareer')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{career}</MysticalText>
-                                        </View>
-                                        <View style={styles.dailyGuideSection}>
-                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={2}>{relationships}</MysticalText>
-                                        </View>
-                                        <View style={styles.dailyGuideSection}>
-                                            <MysticalText variant="caption" style={styles.dailyGuideLabel}>{t('dailyActionGuideAction')}</MysticalText>
-                                            <MysticalText variant="body" style={styles.dailyGuideText} numberOfLines={1}>{action}</MysticalText>
-                                        </View>
+
+                                <View style={styles.guideSectionDivider} />
+
+                                {/* Relationships */}
+                                <View style={styles.guideSection}>
+                                    <View style={[styles.guideSectionIcon, { backgroundColor: 'rgba(231,76,60,0.12)' }]}>
+                                        <Heart color="#e74c3c" size={18} />
                                     </View>
-                                    <LinearGradient
-                                        colors={['rgba(10,6,18,0)', 'rgba(10,6,18,0.7)', 'rgba(10,6,18,0.95)']}
-                                        style={styles.dailyGuideTeaserGradient}
-                                        pointerEvents="none"
-                                    />
-                                    <View style={styles.dailyGuideTeaserCta} pointerEvents="none">
-                                        <Lock color={Colors.primary} size={28} style={styles.dailyGuideTeaserLock} />
-                                        <MysticalText variant="subtitle" style={styles.dailyGuideTeaserCtaText}>{t('dailyGuideUnlockCta')}</MysticalText>
+                                    <View style={styles.guideSectionBody}>
+                                        <MysticalText style={styles.guideSectionLabel}>{t('dailyActionGuideRelationships')}</MysticalText>
+                                        <MysticalText style={styles.guideSectionText}>{relationships}</MysticalText>
                                     </View>
-                                </TouchableOpacity>
-                            </GlassCard>
+                                </View>
+
+                                {embedCtas && <VaultCtaInGuide />}
+
+                                {/* Today's Action – gold highlight */}
+                                <View style={styles.guideActionBlock}>
+                                    <View style={styles.guideActionHeader}>
+                                        <Zap color={Colors.primary} size={13} />
+                                        <MysticalText style={styles.guideActionLabel}>{t('dailyActionGuideAction')}</MysticalText>
+                                    </View>
+                                    <MysticalText style={styles.guideActionText}>{action}</MysticalText>
+                                </View>
+
+                                {embedCtas && <OracleCtaInGuide />}
+                            </>
+                        );
+
+                        return (
+                            <View style={styles.guideCardOuter} onLayout={onGuideCardLayout} collapsable={false}>
+                            <View style={[styles.guideCard, walkthroughStep === 1 && styles.guideCardHighlight]}>
+                                {/* Card header: number circle + title + theme */}
+                                <View style={styles.guideCardHeader}>
+                                    <View style={styles.guideNumberCircle}>
+                                        <MysticalText style={styles.guideNumberText}>{guideDisplayNumber}</MysticalText>
+                                    </View>
+                                    <View style={styles.guideHeaderMeta}>
+                                        <MysticalText style={styles.guideCardTitle}>{t('dailyActionGuide')}</MysticalText>
+                                        <MysticalText style={styles.guideTheme} numberOfLines={2}>{theme}</MysticalText>
+                                    </View>
+                                </View>
+
+                                <View style={styles.guideHeaderDivider} />
+
+                                {isPro ? (
+                                    <GuideBody embedCtas />
+                                ) : (
+                                    <>
+                                        <TouchableOpacity onPress={openPaywall} activeOpacity={1}>
+                                            <View style={styles.guideTeaserContent} pointerEvents="none">
+                                                <GuideBody embedCtas={false} />
+                                            </View>
+                                            <LinearGradient
+                                                colors={['rgba(10,6,18,0)', 'rgba(10,6,18,0.82)', 'rgba(10,6,18,0.97)']}
+                                                style={styles.guideTeaserGradient}
+                                                pointerEvents="none"
+                                            />
+                                            <View style={styles.guideTeaserCta} pointerEvents="none">
+                                                <Lock color={Colors.primary} size={24} />
+                                                <MysticalText style={styles.guideTeaserText}>{t('dailyGuideUnlockCta')}</MysticalText>
+                                            </View>
+                                        </TouchableOpacity>
+                                        {/* Tappable CTAs outside paywall overlay (same order as Pro) */}
+                                        <VaultCtaInGuide />
+                                        <OracleCtaInGuide />
+                                    </>
+                                )}
+                                <MysticalText style={styles.guideFooterHint}>
+                                    {t('dailyActionGuideComeBackTomorrow')}
+                                </MysticalText>
+                            </View>
+                            {walkthroughStep === 1 && (
+                                <Animated.View
+                                    style={[StyleSheet.absoluteFill, styles.guideCardGlowRing, { opacity: guideGlowAnim }]}
+                                    pointerEvents="none"
+                                />
+                            )}
+                            </View>
                         );
                     })()}
+
+                    {/* Cosmic Toolkit Section */}
+                    <View style={styles.section}>
+                        <View style={styles.toolkitHeader}>
+                            <MysticalText variant="subtitle" style={[styles.sectionTitle, { marginBottom: 0 }]}>{t('toolkitTitle') || 'Cosmic Toolkit'}</MysticalText>
+                            <TouchableOpacity onPress={() => setShowToolkitInfo(true)} hitSlop={10} style={styles.infoBtn}>
+                                <Info color={Colors.textSecondary} size={16} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolkitScroll}>
+                            <TouchableOpacity style={styles.toolkitCard} onPress={() => (navigation as any).navigate('PhoneNumberEnergy')}>
+                                <View style={styles.toolkitIconBox}>
+                                    <Phone color={Colors.primary} size={24} />
+                                </View>
+                                <MysticalText style={styles.toolkitCardTitle}>{t('toolkitCardPhoneTitle') || 'Phone Number'}</MysticalText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.toolkitCard} onPress={() => (navigation as any).navigate('HomeEnergy')}>
+                                <View style={styles.toolkitIconBox}>
+                                    <Home color={Colors.primary} size={24} />
+                                </View>
+                                <MysticalText style={styles.toolkitCardTitle}>{t('toolkitCardHomeTitle') || 'Home Energy'}</MysticalText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.toolkitCard} onPress={() => (navigation as any).navigate('NameEnergy')}>
+                                <View style={styles.toolkitIconBox}>
+                                    <Type color={Colors.primary} size={24} />
+                                </View>
+                                <MysticalText style={styles.toolkitCardTitle}>{t('toolkitCardNamesTitle') || 'Name Energy'}</MysticalText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.toolkitCard} onPress={() => (navigation as any).navigate('DateEnergy')}>
+                                <View style={styles.toolkitIconBox}>
+                                    <Calendar color={Colors.primary} size={24} />
+                                </View>
+                                <MysticalText style={styles.toolkitCardTitle}>{t('toolkitCardDatesTitle') || 'Important Dates'}</MysticalText>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
 
                     {/* View full analysis – show for anyone with stored reading; Pro opens analysis, non-Pro opens paywall */}
                     {hasStoredReading && (
@@ -510,9 +798,151 @@ export const HomeScreen: React.FC<Props> = ({ route, navigation }) => {
                         </GlassCard>
                     </View>
 
+
+
                 </ScrollView>
             </SafeAreaView>
         </GradientBackground>
+
+        {/* ── Three-step Walkthrough Overlay ── */}
+        <Modal
+            visible={walkthroughStep > 0}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+        >
+            <View style={[styles.wtBackdrop, walkthroughStep === 1 && styles.wtBackdropLight]}>
+                {/* Skip */}
+                <Pressable
+                    style={[styles.wtSkipBtn, { top: insets.top + 14 }]}
+                    onPress={dismissWalkthrough}
+                    hitSlop={14}
+                >
+                    <MysticalText style={styles.wtSkipText}>{t('walkthroughSkip')}</MysticalText>
+                </Pressable>
+
+                {/* Step 1 — Daily Action Guide (scroll + lighter veil so card reads clearly) */}
+                {walkthroughStep === 1 && (
+                    <View style={[styles.wtStep1TopWrap, { paddingTop: insets.top + 52 }]}>
+                        <View style={styles.wtCard}>
+                            <View style={styles.wtDots}>
+                                <View style={[styles.wtDot, styles.wtDotActive]} />
+                                <View style={styles.wtDot} />
+                                <View style={styles.wtDot} />
+                            </View>
+                            <View style={[styles.wtIconCircle, { backgroundColor: 'rgba(155,89,182,0.18)' }]}>
+                                <Zap color={Colors.secondary} size={26} />
+                            </View>
+                            <MysticalText variant="h2" style={styles.wtTitle}>{t('walkthroughStep1Title')}</MysticalText>
+                            <MysticalText style={styles.wtBody}>{t('walkthroughStep1Body')}</MysticalText>
+                            <View style={styles.wtBtnRow}>
+                                <Pressable style={styles.wtNextBtn} onPress={advanceWalkthrough} hitSlop={8}>
+                                    <MysticalText style={styles.wtNextText}>{t('walkthroughNext')} →</MysticalText>
+                                </Pressable>
+                            </View>
+                        </View>
+                        <View style={styles.wtArrowDown} />
+                    </View>
+                )}
+
+                {/* Step 2 — Oracle tab */}
+                {walkthroughStep === 2 && (
+                    <>
+                        <Animated.View
+                            style={[
+                                styles.wtOraclePulse,
+                                {
+                                    left: SCREEN_W * 0.3 - 28,
+                                    bottom: insets.bottom + 4,
+                                    transform: [{ scale: pulseAnim }],
+                                },
+                            ]}
+                        />
+                        <View style={[styles.wtStep2Wrapper, { bottom: insets.bottom + 84 }]}>
+                            <View style={styles.wtCard}>
+                                <View style={styles.wtDots}>
+                                    <View style={styles.wtDot} />
+                                    <View style={[styles.wtDot, styles.wtDotActive]} />
+                                    <View style={styles.wtDot} />
+                                </View>
+                                <View style={[styles.wtIconCircle, { backgroundColor: 'rgba(155,89,182,0.15)' }]}>
+                                    <MessageCircle color="#9b59b6" size={26} />
+                                </View>
+                                <MysticalText variant="h2" style={styles.wtTitle}>{t('walkthroughStep2Title')}</MysticalText>
+                                <MysticalText style={styles.wtBody}>{t('walkthroughStep2Body')}</MysticalText>
+                                <View style={styles.wtBtnRow}>
+                                    <Pressable style={styles.wtNextBtn} onPress={advanceWalkthrough} hitSlop={8}>
+                                        <MysticalText style={styles.wtNextText}>{t('walkthroughNext')} →</MysticalText>
+                                    </Pressable>
+                                </View>
+                            </View>
+                            <View style={styles.wtArrowDown} />
+                        </View>
+                    </>
+                )}
+
+                {/* Step 3 — Vault tab */}
+                {walkthroughStep === 3 && (
+                    <>
+                        <Animated.View
+                            style={[
+                                styles.wtVaultPulse,
+                                {
+                                    left: SCREEN_W * 0.5 - 28,
+                                    bottom: insets.bottom + 4,
+                                    transform: [{ scale: pulseAnim }],
+                                },
+                            ]}
+                        />
+                        <View style={[styles.wtStep2Wrapper, { bottom: insets.bottom + 84 }]}>
+                            <View style={styles.wtCard}>
+                                <View style={styles.wtDots}>
+                                    <View style={styles.wtDot} />
+                                    <View style={styles.wtDot} />
+                                    <View style={[styles.wtDot, styles.wtDotActive]} />
+                                </View>
+                                <View style={[styles.wtIconCircle, { backgroundColor: 'rgba(52,211,153,0.15)' }]}>
+                                    <Users color="#34d399" size={26} />
+                                </View>
+                                <MysticalText variant="h2" style={styles.wtTitle}>{t('walkthroughStep3Title')}</MysticalText>
+                                <MysticalText style={styles.wtBody}>{t('walkthroughStep3Body')}</MysticalText>
+                                <Pressable style={styles.wtDoneBtn} onPress={dismissWalkthrough} hitSlop={8}>
+                                    <MysticalText style={styles.wtNextText}>{t('walkthroughDone')}</MysticalText>
+                                </Pressable>
+                            </View>
+                            <View style={styles.wtArrowDown} />
+                        </View>
+                    </>
+                )}
+            </View>
+        </Modal>
+
+        {/* ── Toolkit Info Modal ── */}
+        <Modal
+            visible={showToolkitInfo}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setShowToolkitInfo(false)}
+        >
+            <View style={[styles.wtBackdrop, { justifyContent: 'center', paddingHorizontal: 24 }]}>
+                <View style={styles.wtCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <MysticalText variant="h2" style={styles.wtTitle}>{t('toolkitTitle') || 'Numerology Toolkit'}</MysticalText>
+                        <TouchableOpacity onPress={() => setShowToolkitInfo(false)} hitSlop={10}>
+                            <X color={Colors.textSecondary} size={24} />
+                        </TouchableOpacity>
+                    </View>
+                    <MysticalText style={styles.wtBody}>
+                        {t('toolkitExplanation') || 'Quick tools to read the energy of numbers, names, and dates.'}
+                    </MysticalText>
+                    <Pressable style={[styles.wtDoneBtn, { marginTop: 16 }]} onPress={() => setShowToolkitInfo(false)}>
+                        <MysticalText style={styles.wtNextText}>{t('continue') || 'Continue'}</MysticalText>
+                    </Pressable>
+                </View>
+            </View>
+        </Modal>
+        </>
     );
 };
 
@@ -578,98 +1008,199 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         opacity: 0.9,
     },
-    dailyGuideCard: {
-        padding: 20,
-        marginBottom: 24,
-        borderLeftWidth: 4,
-        borderLeftColor: Colors.secondary,
-    },
-    dailyGuideHeader: {
-        flexDirection: 'row',
+    oracleLoadingWrap: {
         alignItems: 'center',
-        gap: 8,
-        marginBottom: 8,
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 8,
     },
-    dailyGuideTitle: {
-        flex: 1,
-        fontSize: 12,
-        fontWeight: '700',
-        color: Colors.secondary,
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    dailyGuideBadge: {
-        backgroundColor: 'rgba(155, 89, 182, 0.25)',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    dailyGuideBadgeText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: Colors.secondary,
-    },
-    dailyGuideTheme: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: Colors.primary,
-        marginBottom: 16,
-        lineHeight: 22,
-    },
-    dailyGuideSection: {
-        marginBottom: 14,
-    },
-    dailyGuideLabel: {
+    oracleLoadingText: {
+        fontSize: 15,
         color: Colors.textSecondary,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 4,
-        fontWeight: '600',
+        textAlign: 'center',
+        letterSpacing: 0.2,
     },
-    dailyGuideText: {
-        fontSize: 14,
-        lineHeight: 21,
-        opacity: 0.92,
+    // Daily Action Guide — redesigned
+    guideCardOuter: {
+        marginBottom: 24,
+        borderRadius: 20,
     },
-    dailyGuideActionWrap: {
-        marginBottom: 0,
-        backgroundColor: 'rgba(212, 175, 55, 0.08)',
-        padding: 12,
-        borderRadius: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: Colors.primary,
-    },
-    dailyGuideActionText: {
-        fontSize: 14,
-        lineHeight: 21,
-        fontWeight: '600',
-        color: Colors.text,
-    },
-    dailyGuideTeaserWrap: {
-        position: 'relative',
-        marginTop: 8,
-        minHeight: 140,
-        borderRadius: 12,
+    guideCard: {
+        backgroundColor: 'rgba(155,89,182,0.05)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(155,89,182,0.22)',
         overflow: 'hidden',
     },
-    dailyGuideTeaserContent: {
-        paddingVertical: 8,
-        opacity: 0.5,
+    guideCardHighlight: {
+        borderColor: Colors.secondary,
+        borderWidth: 2,
     },
-    dailyGuideTeaserGradient: {
-        ...StyleSheet.absoluteFillObject,
+    guideCardGlowRing: {
+        borderRadius: 20,
+        borderWidth: 3,
+        borderColor: Colors.secondary,
     },
-    dailyGuideTeaserCta: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
+    guideCardHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 24,
+        gap: 14,
+        padding: 16,
+        paddingBottom: 14,
     },
-    dailyGuideTeaserLock: {
-        marginBottom: 10,
+    guideNumberCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(155,89,182,0.2)',
+        borderWidth: 1.5,
+        borderColor: 'rgba(155,89,182,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        shadowColor: Colors.secondary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 4,
     },
-    dailyGuideTeaserCtaText: {
+    guideNumberText: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: Colors.secondary,
+        lineHeight: 28,
+    },
+    guideHeaderMeta: {
+        flex: 1,
+    },
+    guideCardTitle: {
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        color: Colors.secondary,
+        marginBottom: 4,
+        opacity: 0.8,
+    },
+    guideTheme: {
+        fontSize: 15,
+        fontWeight: '700',
         color: Colors.primary,
+        lineHeight: 20,
+    },
+    guideHeaderDivider: {
+        height: 1,
+        backgroundColor: 'rgba(155,89,182,0.15)',
+        marginHorizontal: 16,
+        marginBottom: 4,
+    },
+    guideSection: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
+    guideSectionIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        marginTop: 1,
+    },
+    guideSectionBody: {
+        flex: 1,
+    },
+    guideSectionLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        color: Colors.textSecondary,
+        marginBottom: 5,
+    },
+    guideSectionText: {
+        fontSize: 14,
+        lineHeight: 22,
+        color: 'rgba(255,255,255,0.88)',
+    },
+    guideSectionDivider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        marginHorizontal: 16,
+    },
+    guideActionBlock: {
+        marginHorizontal: 12,
+        marginTop: 10,
+        marginBottom: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        backgroundColor: 'rgba(212,175,55,0.12)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.32)',
+        borderLeftWidth: 4,
+        borderLeftColor: Colors.primary,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.16,
+        shadowRadius: 12,
+        elevation: 4,
+    },
+    guideActionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 8,
+    },
+    guideActionLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 1.6,
+        textTransform: 'uppercase',
+        color: Colors.primary,
+    },
+    guideActionText: {
+        fontSize: 15,
+        lineHeight: 24,
+        fontWeight: '700',
+        color: Colors.text,
+    },
+    guideFooterHint: {
+        fontSize: 12,
+        lineHeight: 17,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 4,
+        paddingBottom: 16,
+        opacity: 0.75,
+    },
+    // Teaser (free users)
+    guideTeaserContent: {
+        opacity: 0.45,
+    },
+    guideTeaserGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 160,
+    },
+    guideTeaserCta: {
+        position: 'absolute',
+        bottom: 24,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        gap: 8,
+    },
+    guideTeaserText: {
+        color: Colors.primary,
+        fontWeight: '700',
+        fontSize: 15,
         textAlign: 'center',
     },
     viewAnalysisWrap: {
@@ -799,6 +1330,44 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         textTransform: 'uppercase',
     },
+    toolkitScroll: {
+        gap: 16,
+        paddingRight: 20,
+    },
+    toolkitHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 15,
+        paddingRight: 5,
+    },
+    infoBtn: {
+        padding: 4,
+    },
+    toolkitCard: {
+        width: 140,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        padding: 16,
+        alignItems: 'center',
+        gap: 12,
+    },
+    toolkitIconBox: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    toolkitCardTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text,
+        textAlign: 'center',
+    },
     numbersGrid: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -878,6 +1447,52 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: Colors.text,
     },
+    // CTA banners
+    ctaBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.07)',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginBottom: 16,
+    },
+    ctaBannerLast: {
+        marginBottom: 8,
+    },
+    /** CTAs nested inside Daily Action Guide card */
+    ctaInGuide: {
+        marginHorizontal: 12,
+        marginBottom: 10,
+    },
+    ctaInGuideLast: {
+        marginBottom: 14,
+    },
+    ctaIconCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    ctaBody: {
+        flex: 1,
+        gap: 2,
+    },
+    ctaQuestion: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+        lineHeight: 16,
+    },
+    ctaAction: {
+        fontSize: 13,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
     oracleIconBox: {
         width: 44,
         height: 44,
@@ -896,5 +1511,140 @@ const styles = StyleSheet.create({
     oracleSub: {
         fontSize: 12,
         color: Colors.textSecondary,
+    },
+    // ── Walkthrough overlay ───────────────────────────────────────────────
+    wtBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(5,0,20,0.88)',
+    },
+    wtBackdropLight: {
+        backgroundColor: 'rgba(5,0,20,0.55)',
+    },
+    wtSkipBtn: {
+        position: 'absolute',
+        right: 20,
+        zIndex: 10,
+    },
+    wtSkipText: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.4)',
+        fontWeight: '500',
+    },
+    wtStep1TopWrap: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        zIndex: 2,
+    },
+    wtStep2Wrapper: {
+        position: 'absolute',
+        left: 24,
+        right: 24,
+        alignItems: 'center',
+    },
+    wtCard: {
+        width: '100%',
+        backgroundColor: '#0f0820',
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.3)',
+        padding: 24,
+        gap: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    wtDots: {
+        flexDirection: 'row',
+        gap: 6,
+    },
+    wtDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    wtDotActive: {
+        width: 18,
+        backgroundColor: '#d4af37',
+    },
+    wtIconCircle: {
+        width: 58,
+        height: 58,
+        borderRadius: 29,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    wtTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: Colors.primary,
+    },
+    wtBody: {
+        fontSize: 14,
+        lineHeight: 22,
+        color: 'rgba(255,255,255,0.72)',
+    },
+    wtBtnRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 2,
+    },
+    wtNextBtn: {
+        backgroundColor: 'rgba(212,175,55,0.12)',
+        borderRadius: 12,
+        paddingVertical: 11,
+        paddingHorizontal: 22,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.3)',
+    },
+    wtDoneBtn: {
+        backgroundColor: 'rgba(212,175,55,0.12)',
+        borderRadius: 12,
+        paddingVertical: 11,
+        borderWidth: 1,
+        borderColor: 'rgba(212,175,55,0.3)',
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    wtNextText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#d4af37',
+    },
+    wtArrowDown: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 12,
+        borderRightWidth: 12,
+        borderTopWidth: 16,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: '#0f0820',
+        alignSelf: 'center',
+        marginTop: -1,
+    },
+    wtOraclePulse: {
+        position: 'absolute',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 2.5,
+        borderColor: '#9b59b6',
+        backgroundColor: 'rgba(155,89,182,0.15)',
+    },
+    wtVaultPulse: {
+        position: 'absolute',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        borderWidth: 2.5,
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52,211,153,0.12)',
     },
 });

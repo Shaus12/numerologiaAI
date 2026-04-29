@@ -5,7 +5,7 @@ import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { ChevronLeft, Calendar } from 'lucide-react-native';
+import { Calendar } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSettings } from '../../context/SettingsContext';
 import { usePostHog } from 'posthog-react-native';
@@ -22,11 +22,10 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
     const { t, language } = useSettings();
     const posthog = usePostHog();
     const [date, setDate] = useState(new Date(1990, 0, 1));
-    const [show, setShow] = useState(true);
 
     const handleContinue = () => {
         if (posthog) {
-            posthog.capture('onboarding_step_completed', { step_name: 'birthdate', step_number: 11 });
+            posthog.capture('onboarding_step_completed', { step_name: 'birthdate', step_number: 4 });
         }
         onContinue(date);
     };
@@ -38,7 +37,7 @@ export const BirthdateScreen: React.FC<BirthdateScreenProps> = ({ onContinue, on
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={9} totalSteps={11} onBack={onBack} />
+            <OnboardingHeader step={4} totalSteps={7} onBack={onBack} />
 
             <View style={styles.header}>
                 <View style={styles.titleWrap}>

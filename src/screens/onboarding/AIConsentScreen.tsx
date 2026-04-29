@@ -22,7 +22,7 @@ export const AIConsentScreen: React.FC<AIConsentScreenProps> = ({ onBack, onCont
     const handleContinue = () => {
         try {
             if (posthog) {
-                posthog.capture('onboarding_step_completed', { step_name: 'ai_consent', step_number: 13 });
+                posthog.capture('onboarding_step_completed', { step_name: 'ai_consent', step_number: 7 });
             }
         } catch (_) {}
         onContinue();
@@ -30,7 +30,7 @@ export const AIConsentScreen: React.FC<AIConsentScreenProps> = ({ onBack, onCont
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={10} totalSteps={11} onBack={onBack} />
+            <OnboardingHeader step={7} totalSteps={7} onBack={onBack} />
 
             <View style={styles.header}>
                 <View style={styles.iconWrap}>

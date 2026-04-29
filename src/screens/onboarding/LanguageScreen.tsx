@@ -41,7 +41,7 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue, onBa
 
     const handleContinue = async () => {
         if (posthog) {
-            posthog.capture('onboarding_step_completed', { step_name: 'language', step_number: 2 });
+            posthog.capture('onboarding_step_completed', { step_name: 'language', step_number: 1 });
         }
         await setLanguage(selected as any);
         onContinue(selected);
@@ -49,7 +49,7 @@ export const LanguageScreen: React.FC<LanguageScreenProps> = ({ onContinue, onBa
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={1} totalSteps={11} onBack={onBack} />
+            <OnboardingHeader step={1} totalSteps={7} onBack={onBack} />
             <View style={styles.header}>
                 <View style={styles.iconContainer}>
                     <Globe color={Colors.primary} size={40} />

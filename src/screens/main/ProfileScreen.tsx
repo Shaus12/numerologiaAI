@@ -30,7 +30,6 @@ const LANGUAGE_LABEL_KEYS: Record<Language, string> = {
 import { CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { scheduleDailyMorningReminder } from '../../utils/notifications';
-import { touchDebug } from '../../utils/touchDebug';
 import Purchases from 'react-native-purchases';
 import { useUser } from '../../context/UserContext';
 
@@ -175,7 +174,6 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                     text: t('delete'),
                     style: 'destructive',
                     onPress: async () => {
-                        touchDebug("ProfileDeleteAccountConfirmed");
                         await clearUserData();
                     }
                 }
@@ -218,7 +216,6 @@ export const ProfileScreen: React.FC<Props> = ({ route, navigation }) => {
                             </TouchableOpacity>
                         ) : (
                             <TouchableOpacity style={styles.upgradeButton} onPress={() => {
-                                touchDebug("ProfileUpgradePressed");
                                 navigation.navigate('Paywall');
                             }}>
                                 <Star color="#FFF" size={16} strokeWidth={2.5} />

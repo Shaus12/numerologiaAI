@@ -132,13 +132,58 @@ export const NumerologyEngine = {
     calculatePersonalYear: (birthdate: string | Date, currentYear: number = new Date().getFullYear()): number => {
         const { day, month } = getBirthdateLocalParts(birthdate);
 
-        const reduce = (num: number): number => {
-            if (num <= 9 || num === 11 || num === 22 || num === 33) return num;
-            return reduce(String(num).split('').reduce((acc, d) => acc + parseInt(d), 0));
-        };
+        // Sum reduced parts
+        const sum = NumerologyEngine.reduceToSingleDigit(day) + 
+                    NumerologyEngine.reduceToSingleDigit(month) + 
+                    NumerologyEngine.reduceToSingleDigit(currentYear);
+                    
+        return NumerologyEngine.reduceToSingleDigit(sum);
+    },
 
-        const sum = reduce(day) + reduce(month) + reduce(String(currentYear).split('').reduce((acc, d) => acc + parseInt(d), 0));
-        return reduce(sum);
+    /**
+     * Calculates Personal Year strictly for the Cosmic Roadmap based on Life Path + Year
+     */
+    calculateRoadmapPersonalYear: (lifePath: number, year: number): number => {
+        const yearSum = NumerologyEngine.reduceToSingleDigit(year);
+        return NumerologyEngine.reduceToSingleDigit(lifePath + yearSum);
+    },
+
+    /**
+     * Returns a Harmony Score (0-100) representing how well a Personal Year matches a Life Path
+     */
+    getHarmonyScore: (lifePath: number, personalYear: number): number => {
+        const excellentPairs: Record<number, number[]> = {
+            1: [1, 5, 7, 8], 2: [1, 2, 4, 6, 8], 3: [3, 5, 6, 9],
+            4: [2, 4, 6, 8], 5: [1, 3, 5, 7], 6: [2, 3, 4, 6, 9],
+            7: [1, 5, 7, 9], 8: [1, 2, 4, 8], 9: [3, 6, 7, 9]
+        };
+        
+        const challengingPairs: Record<number, number[]> = {
+            1: [2, 4, 6], 2: [5, 7, 9], 3: [4, 8],
+            4: [1, 3, 5, 9], 5: [2, 4, 6], 6: [1, 5, 7],
+            7: [2, 6, 8], 8: [3, 7, 9], 9: [2, 4, 8]
+        };
+        
+        const lpRaw = NumerologyEngine.reduceToSingleDigit(lifePath);
+        const pyRaw = NumerologyEngine.reduceToSingleDigit(personalYear);
+        
+        let baseScore = 65; // Default neutral
+        if (excellentPairs[lpRaw]?.includes(pyRaw)) baseScore = 90;
+        else if (challengingPairs[lpRaw]?.includes(pyRaw)) baseScore = 40;
+        
+        // Add a deterministic semi-random fluctuation based on the numbers themselves to make it feel organic without Math.random() jumping on re-renders
+        return Math.min(100, Math.max(0, baseScore + ((lpRaw * pyRaw) % 10) - 5));
+    },
+
+    /**
+     * Calculates Personal Month Number
+     */
+    calculatePersonalMonth: (personalYear: number, currentMonth: number = new Date().getMonth() + 1): number => {
+        // Reduced Personal Year + Reduced Calendar Month
+        const sum = NumerologyEngine.reduceToSingleDigit(personalYear) + 
+                    NumerologyEngine.reduceToSingleDigit(currentMonth);
+                    
+        return NumerologyEngine.reduceToSingleDigit(sum);
     },
 
     /**
@@ -148,13 +193,11 @@ export const NumerologyEngine = {
         const day = date.getDate();
         const month = date.getMonth() + 1;
 
-        const reduce = (num: number): number => {
-            if (num <= 9 || num === 11 || num === 22 || num === 33) return num;
-            return reduce(String(num).split('').reduce((acc, d) => acc + parseInt(d), 0));
-        };
-
-        const sum = reduce(personalYear) + reduce(day) + reduce(month);
-        return reduce(sum);
+        const sum = NumerologyEngine.reduceToSingleDigit(personalYear) + 
+                    NumerologyEngine.reduceToSingleDigit(day) + 
+                    NumerologyEngine.reduceToSingleDigit(month);
+                    
+        return NumerologyEngine.reduceToSingleDigit(sum);
     },
 
     /**

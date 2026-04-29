@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
-import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
 import { Briefcase, Heart, Sparkles, Activity } from 'lucide-react-native';
@@ -25,18 +24,17 @@ const FOCI = [
 export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
     const posthog = usePostHog();
-    const [selected, setSelected] = useState<string | null>(null);
 
-    const handleContinue = () => {
+    const handleSelect = (focus: string) => {
         if (posthog) {
-            posthog.capture('onboarding_step_completed', { step_name: 'focus', step_number: 8 });
+            posthog.capture('onboarding_step_completed', { step_name: 'focus', step_number: 5 });
         }
-        onContinue(selected!);
+        onContinue(focus);
     };
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={6} totalSteps={11} onBack={onBack} />
+            <OnboardingHeader step={5} totalSteps={7} onBack={onBack} />
 
             <ScrollView
                 style={styles.scroll}
@@ -58,15 +56,15 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue, onBack }) 
 
                 <View style={styles.options}>
                     {FOCI.map((item) => (
-                        <TouchableOpacity key={item.id} onPress={() => setSelected(item.id)} activeOpacity={0.7}>
-                            <GlassCard style={[styles.option, selected === item.id && styles.optionActive]} border={selected === item.id}>
+                        <TouchableOpacity key={item.id} onPress={() => handleSelect(item.id)} activeOpacity={0.7}>
+                            <GlassCard style={styles.option}>
                                 <View style={styles.optionContent}>
                                     <View style={styles.textPart}>
                                         <MysticalText variant="body" style={styles.optionTitle}>{t(item.labelKey)}</MysticalText>
                                         <MysticalText variant="caption" style={styles.optionSub}>{t(item.subKey)}</MysticalText>
                                     </View>
                                     <View style={styles.iconBox}>
-                                        <item.icon color={selected === item.id ? Colors.primary : Colors.textSecondary} size={28} />
+                                        <item.icon color={Colors.textSecondary} size={28} />
                                     </View>
                                 </View>
                             </GlassCard>
@@ -78,14 +76,6 @@ export const FocusScreen: React.FC<FocusScreenProps> = ({ onContinue, onBack }) 
                     {t('focusFooterNote')}
                 </MysticalText>
             </ScrollView>
-
-            <View style={styles.footer}>
-                <Button
-                    title={t('continue')}
-                    onPress={handleContinue}
-                    disabled={selected === null}
-                />
-            </View>
         </GradientBackground>
     );
 };
@@ -99,12 +89,10 @@ const styles = StyleSheet.create({
     subtitle: { textAlign: 'center', color: Colors.textSecondary, marginBottom: 35 },
     options: { gap: 15 },
     option: { padding: 20 },
-    optionActive: { backgroundColor: 'rgba(212, 175, 55, 0.05)', borderColor: Colors.primary },
     optionContent: { flexDirection: 'row', alignItems: 'center' },
     textPart: { flex: 1, paddingRight: 10 },
     optionTitle: { fontWeight: '700', fontSize: 18 },
     optionSub: { marginTop: 5, opacity: 0.6 },
     iconBox: { width: 56, height: 56, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
     footerNote: { textAlign: 'center', marginTop: 30, opacity: 0.5 },
-    footer: { padding: 25, paddingBottom: 50 },
 });

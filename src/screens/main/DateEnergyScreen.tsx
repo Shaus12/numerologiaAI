@@ -75,6 +75,7 @@ export const DateEnergyScreen: React.FC<Props> = ({ navigation }) => {
     const [selectedDate, setSelectedDate] = useState(() => new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [result, setResult] = useState<number | null>(null);
+    const [isCalculating, setIsCalculating] = useState(false);
 
     const handleBack = () => {
         Keyboard.dismiss();

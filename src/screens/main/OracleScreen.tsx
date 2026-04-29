@@ -11,7 +11,6 @@ import { Send, Sparkles, Lock, ArrowLeft, Share, History, X } from 'lucide-react
 import { Share as RNShare } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 import { AIService } from '../../services/ai';
-import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { useRevenueCat } from '../../context/RevenueCatContext';
 import { useUser } from '../../context/UserContext';
@@ -96,11 +95,8 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
         const isInputEmpty = !text.trim();
 
         if (isInputEmpty || loading || cooldown) {
-            touchDebug("OracleSendBlocked", { loading, cooldown, isInputEmpty });
             return;
         }
-
-        touchDebug("OracleSendPressed", { textLength: text.length });
 
         const userMsg: Message = { id: Date.now().toString(), text, sender: 'user' };
         setMessages(prev => [...prev, userMsg]);
@@ -114,12 +110,11 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
         }, 500);
 
         try {
-            const personalization = (userProfile?.identity || userProfile?.focus || userProfile?.challenge || userProfile?.relationshipStatus)
+            const personalization = (userProfile?.identity || userProfile?.focus || userProfile?.challenge)
                 ? {
                     identity: userProfile?.identity,
                     focus: userProfile?.focus,
                     challenge: userProfile?.challenge,
-                    relationshipStatus: userProfile?.relationshipStatus,
                 }
                 : undefined;
             const response = await AIService.generateOracleResponse(text, lifePath, language, personalization);
@@ -127,7 +122,6 @@ export const OracleScreen: React.FC<Props> = ({ route, navigation }) => {
             setMessages(prev => [...prev, oracleMsg]);
             saveToHistory(text, response);
         } catch (error) {
-            touchDebug("OracleSendError", error);
             console.error(error);
         } finally {
             setLoading(false);
@@ -297,7 +291,7 @@ const OraclePaywallOverlay = ({ onBack, navigation }: { onBack: () => void; navi
     const { t } = useSettings();
     const openPaywall = () => {
         onBack();
-        navigation.navigate('Paywall');
+        navigation.getParent()?.navigate('Paywall');
     };
 
     return (

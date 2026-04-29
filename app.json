@@ -3,7 +3,7 @@
     "name": "Echoes",
     "slug": "numerologiaai",
     "owner": "kretay",
-    "version": "1.0.2",
+    "version": "1.1.4",
     "orientation": "portrait",
     "icon": "./assets/numrologyAI_logo.png",
     "userInterfaceStyle": "light",
@@ -34,7 +34,26 @@
     },
     "plugins": [
       "@react-native-community/datetimepicker",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "We use this identifier to measure installs from ads and improve campaign performance."
+        }
+      ],
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "26922725060658666",
+          "clientToken": "5c3b5243dc3bfdd45b1112ed1f9a5203",
+          "displayName": "Echoes: Numerology Map",
+          "scheme": "fb26922725060658666",
+          "isAutoInitEnabled": false,
+          "autoLogAppEventsEnabled": true,
+          "advertiserIDCollectionEnabled": true,
+          "iosUserTrackingPermission": "We use this identifier to measure installs from ads and improve campaign performance."
+        }
+      ]
     ],
     "extra": {
       "eas": {

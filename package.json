@@ -27,17 +27,22 @@
     "expo-notifications": "~0.32.16",
     "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-tracking-transparency": "~6.0.8",
     "expo-updates": "~29.0.16",
     "lucide-react-native": "^0.574.0",
     "posthog-react-native": "^4.37.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-fbsdk-next": "^13.4.3",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-purchases": "^9.10.0",
     "react-native-purchases-ui": "^9.10.3",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0"
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-worklets": "0.5.1",
+    "zustand": "^5.0.12"
   },
   "overrides": {
     "react-native-worklets": "0.5.1"

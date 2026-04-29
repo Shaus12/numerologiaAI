@@ -1,98 +1,85 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Pressable } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
-import { Button } from '../../components/ui/Button';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { Colors } from '../../constants/Colors';
-import { User, UserPlus, Users, EyeOff, ChevronLeft } from 'lucide-react-native';
+import { User, UserPlus, Users, EyeOff } from 'lucide-react-native';
+import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
 import { useSettings } from '../../context/SettingsContext';
 import { usePostHog } from 'posthog-react-native';
-
-interface IdentityOption {
-    id: string;
-    label: string;
-    icon: React.ElementType;
-}
 
 interface IdentityScreenProps {
     onContinue: (identity: string) => void;
     onBack: () => void;
 }
 
-import { OnboardingHeader } from '../../components/shared/OnboardingHeader';
+const OPTIONS = [
+    { id: 'male',       labelKey: 'male' as const,           icon: User },
+    { id: 'female',     labelKey: 'female' as const,         icon: UserPlus },
+    { id: 'non-binary', labelKey: 'nonBinary' as const,      icon: Users },
+    { id: 'private',    labelKey: 'preferNotToSay' as const, icon: EyeOff },
+];
 
 export const IdentityScreen: React.FC<IdentityScreenProps> = ({ onContinue, onBack }) => {
     const { t } = useSettings();
     const posthog = usePostHog();
-    const [selected, setSelected] = useState('private');
 
-    const handleContinue = () => {
-        if (posthog) {
-            posthog.capture('onboarding_step_completed', { step_name: 'identity', step_number: 3 });
-        }
-        onContinue(selected);
+    const handleSelect = (id: string) => {
+        try {
+            if (posthog) {
+                posthog.capture('onboarding_step_completed', { step_name: 'identity', step_number: 3 });
+            }
+        } catch (_) {}
+        onContinue(id);
     };
-
-    const options: IdentityOption[] = [
-        { id: 'male', label: t('male'), icon: User },
-        { id: 'female', label: t('female'), icon: UserPlus },
-        { id: 'non-binary', label: t('nonBinary'), icon: Users },
-        { id: 'private', label: t('preferNotToSay'), icon: EyeOff },
-    ];
 
     return (
         <GradientBackground style={styles.container}>
-            <OnboardingHeader step={2} totalSteps={11} onBack={onBack} />
+            <OnboardingHeader step={3} totalSteps={7} onBack={onBack} />
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                style={styles.scroll}
-                keyboardShouldPersistTaps="handled"
-                delaysContentTouches={false}
-            >
-                <View style={styles.header}>
-                    <View style={styles.titleRow}>
-                        <MysticalText variant="h1" style={styles.title}>{t('identityTitle')}</MysticalText>
-                        <MysticalText variant="h1" style={styles.titleAccent}>{t('identityTitleAccent')}</MysticalText>
-                    </View>
-                    <MysticalText variant="subtitle" style={styles.subtitle}>
-                        {t('identitySubtitle')}
-                    </MysticalText>
+            <View style={styles.header}>
+                <View style={styles.titleRow}>
+                    <MysticalText variant="h1" style={styles.title}>{t('identityTitle')}</MysticalText>
+                    <MysticalText variant="h1" style={styles.titleAccent}> {t('identityTitleAccent')}</MysticalText>
                 </View>
+                <MysticalText variant="subtitle" style={styles.subtitle}>
+                    {t('identitySubtitle')}
+                </MysticalText>
+            </View>
 
-                <View style={styles.optionsGrid}>
-                    {options.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                            <TouchableOpacity
-                                key={item.id}
-                                onPress={() => setSelected(item.id)}
-                                activeOpacity={0.7}
-                                style={item.id === 'private' ? styles.fullWidthOption : styles.halfWidthOption}
-                            >
+            <View style={styles.optionsGrid}>
+                {OPTIONS.map((item) => {
+                    const Icon = item.icon;
+                    const isFullWidth = item.id === 'private';
+                    return (
+                        <Pressable
+                            key={item.id}
+                            onPress={() => handleSelect(item.id)}
+                            style={({ pressed }) => [
+                                isFullWidth ? styles.fullWidthOption : styles.halfWidthOption,
+                                pressed && styles.pressed,
+                            ]}
+                        >
+                            {({ pressed }) => (
                                 <GlassCard
-                                    style={[
-                                        styles.optionCard,
-                                        selected === item.id && styles.selectedCard,
-                                    ]}
-                                    border={selected === item.id}
+                                    style={[styles.optionCard, pressed && styles.selectedCard]}
+                                    border={pressed}
                                 >
-                                    <View style={[styles.iconBox, selected === item.id && styles.iconBoxActive]}>
-                                        <Icon color={selected === item.id ? Colors.primary : Colors.textSecondary} size={24} />
+                                    <View style={[styles.iconBox, pressed && styles.iconBoxActive]}>
+                                        <Icon
+                                            color={pressed ? Colors.primary : Colors.textSecondary}
+                                            size={24}
+                                        />
                                     </View>
                                     <MysticalText variant="body" style={styles.optionLabel}>
-                                        {item.label}
+                                        {t(item.labelKey)}
                                     </MysticalText>
                                 </GlassCard>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            </ScrollView>
-
-            <View style={styles.footer}>
-                <Button title={t('continue')} onPress={handleContinue} />
+                            )}
+                        </Pressable>
+                    );
+                })}
             </View>
         </GradientBackground>
     );
@@ -103,38 +90,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 25,
         paddingBottom: 50,
     },
-    backButton: {
-        marginBottom: 20,
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-    },
-    progressContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    stepText: {
-        color: Colors.primary,
-        fontWeight: '700',
-    },
-    percentText: {
-        color: Colors.textSecondary,
-    },
-    progressBarBg: {
-        width: '100%',
-        height: 4,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 2,
-        marginBottom: 40,
-    },
-    progressBarFilled: {
-        height: '100%',
-        backgroundColor: Colors.primary,
-        borderRadius: 2,
-    },
     header: {
         marginBottom: 40,
+        marginTop: 8,
     },
     titleRow: {
         flexDirection: 'row',
@@ -155,9 +113,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
     },
-    scroll: {
-        flex: 1,
-    },
     optionsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -171,6 +126,10 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 15,
     },
+    pressed: {
+        opacity: 0.85,
+        transform: [{ scale: 0.97 }],
+    },
     optionCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -178,7 +137,7 @@ const styles = StyleSheet.create({
         height: 80,
     },
     selectedCard: {
-        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        backgroundColor: 'rgba(212, 175, 55, 0.15)',
     },
     iconBox: {
         width: 44,
@@ -190,12 +149,9 @@ const styles = StyleSheet.create({
         marginRight: 15,
     },
     iconBoxActive: {
-        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        backgroundColor: 'rgba(212, 175, 55, 0.12)',
     },
     optionLabel: {
         fontWeight: '600',
-    },
-    footer: {
-        marginTop: 20,
     },
 });

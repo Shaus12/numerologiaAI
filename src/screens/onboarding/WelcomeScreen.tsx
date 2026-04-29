@@ -3,7 +3,6 @@ import { StyleSheet, View, Image } from 'react-native';
 import { GradientBackground } from '../../components/shared/GradientBackground';
 import { MysticalText } from '../../components/ui/MysticalText';
 import { Button } from '../../components/ui/Button';
-import { Colors } from '../../constants/Colors';
 import { useSettings } from '../../context/SettingsContext';
 import { usePostHog } from 'posthog-react-native';
 
@@ -39,10 +38,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                     />
                 </View>
 
-                <View style={styles.titleRow}>
-                    <MysticalText variant="h1" style={styles.title}>{t('discoverTitle')}</MysticalText>
-                    <MysticalText variant="h1" style={styles.titleAccent}>{t('discoverTitleAccent')}</MysticalText>
-                    <MysticalText variant="h1" style={styles.title}>{t('discoverTitleEnd')}</MysticalText>
+                <View style={styles.titleBlock}>
+                    <MysticalText variant="h1" style={styles.hookTitle}>
+                        {t('welcomeHookTitle')}
+                    </MysticalText>
                 </View>
 
                 <MysticalText variant="subtitle" style={styles.subtitle}>
@@ -84,18 +83,15 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    titleRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
+    titleBlock: {
         marginBottom: 20,
+        paddingHorizontal: 8,
+        maxWidth: 360,
+        alignSelf: 'center',
     },
-    title: {
+    hookTitle: {
         textAlign: 'center',
-    },
-    titleAccent: {
-        color: Colors.secondary,
-        textAlign: 'center',
+        lineHeight: 34,
     },
     subtitle: {
         textAlign: 'center',

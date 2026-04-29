@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { translations, Language } from '../utils/translations';
+import { resolveOnboardingString } from '../utils/onboardingLocale';
 
 interface SettingsContextType {
     language: Language;
@@ -46,7 +47,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const t = useCallback((key: string) => {
         const currentTranslation = translations[language] || translations['English'];
         if (!currentTranslation) return key;
-        return currentTranslation[key] || translations['English'][key] || key;
+        const fromMain = currentTranslation[key] ?? translations['English'][key];
+        if (fromMain !== undefined) return fromMain;
+        const fromOnboarding = resolveOnboardingString(language, key);
+        if (fromOnboarding !== undefined) return fromOnboarding;
+        return key;
     }, [language]);
 
     const isRTL = useMemo(() => language === 'Hebrew', [language]);

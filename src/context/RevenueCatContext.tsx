@@ -25,21 +25,14 @@ export const useRevenueCat = () => {
     return context;
 };
 
-function computeIsPro(info: CustomerInfo | null): boolean {
+/** True only when the app’s Pro entitlement (or configured alternative ids) is active — not merely “any” entitlement or subscription. */
+export function computeIsPro(info: CustomerInfo | null): boolean {
     if (!info?.entitlements) return false;
 
-    const activeEntitlements = info.entitlements.active || {};
-    const activeIds = Object.keys(activeEntitlements);
-
-    let hasEntitlement = activeEntitlements[RevenueCatConfig.entitlementId] !== undefined;
-
-    if (!hasEntitlement && RevenueCatConfig.alternativeIds) {
-        hasEntitlement = RevenueCatConfig.alternativeIds.some(id => activeEntitlements[id] !== undefined);
-    }
-
-    const hasAnyActiveSub = (info.activeSubscriptions || []).length > 0;
-
-    return hasEntitlement || activeIds.length > 0 || hasAnyActiveSub;
+    const active = info.entitlements.active || {};
+    if (active[RevenueCatConfig.entitlementId] !== undefined) return true;
+    if (RevenueCatConfig.alternativeIds?.some((id) => active[id] !== undefined)) return true;
+    return false;
 }
 
 async function ensureConfigured(): Promise<boolean> {
@@ -78,25 +71,21 @@ export const RevenueCatProvider: React.FC<{ children: ReactNode }> = ({ children
             if (!cancelled) updateIsPro(computeIsPro(info));
         };
 
-        const loadCachedState = async () => {
-            try {
-                const cached = await AsyncStorage.getItem(IS_PRO_CACHE_KEY);
-                if (cached !== null && !cancelled) {
-                    updateIsPro(JSON.parse(cached));
-                }
-            } catch (_) {}
-            if (!cancelled) setIsLoading(false);
-        };
-
+        /**
+         * Do not hydrate `isPro` from AsyncStorage on cold start — a stale `true` causes “ghost Pro.”
+         * `isLoading` stays true until `getCustomerInfo()` completes so the first meaningful frame uses server/SDK state.
+         */
         const initRC = async () => {
             try {
                 Purchases.setLogLevel(LOG_LEVEL.ERROR);
                 const ok = await ensureConfigured();
                 if (!ok || cancelled) return;
+
                 configuredRef.current = true;
 
                 const info = await Purchases.getCustomerInfo();
-                if (info && !cancelled) {
+                if (cancelled) return;
+                if (info) {
                     updateIsPro(computeIsPro(info));
                 }
 
@@ -106,22 +95,22 @@ export const RevenueCatProvider: React.FC<{ children: ReactNode }> = ({ children
                 } catch (_) {}
             } catch (e) {
                 console.error('RevenueCat init error:', e);
+            } finally {
+                if (!cancelled) setIsLoading(false);
             }
         };
 
-        loadCachedState();
-
         const handle = InteractionManager.runAfterInteractions(() => {
-            setTimeout(() => {
-                if (!cancelled) initRC();
-            }, 5000);
+            if (!cancelled) void initRC();
         });
 
         return () => {
             cancelled = true;
             handle.cancel();
             if (listenerAdded) {
-                try { Purchases.removeCustomerInfoUpdateListener(updateListener); } catch (_) {}
+                try {
+                    Purchases.removeCustomerInfoUpdateListener(updateListener);
+                } catch (_) {}
             }
         };
     }, [updateIsPro]);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { InteractionManager, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { RevenueCatProvider } from './src/context/RevenueCatContext';
@@ -7,23 +7,21 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, MainTabParamList } from './src/navigation/types';
 import { SplashScreen } from './src/screens/onboarding/SplashScreen';
 import { WelcomeScreen } from './src/screens/onboarding/WelcomeScreen';
+import { OnboardingFlowScreen } from './src/screens/onboarding/OnboardingFlowScreen';
 import { LanguageScreen } from './src/screens/onboarding/LanguageScreen';
-import { IdentityScreen } from './src/screens/onboarding/IdentityScreen';
 import { NameScreen } from './src/screens/onboarding/NameScreen';
+import { IdentityScreen } from './src/screens/onboarding/IdentityScreen';
 import { BirthdateScreen } from './src/screens/onboarding/BirthdateScreen';
-import { PlaceOfBirthScreen } from './src/screens/onboarding/PlaceOfBirthScreen';
-import { BirthTimeScreen } from './src/screens/onboarding/BirthTimeScreen';
-import { EnterBirthTimeScreen } from './src/screens/onboarding/EnterBirthTimeScreen';
-import { RelationshipScreen } from './src/screens/onboarding/RelationshipScreen';
 import { FocusScreen } from './src/screens/onboarding/FocusScreen';
 import { ChallengeScreen } from './src/screens/onboarding/ChallengeScreen';
-import { ExpectationsScreen } from './src/screens/onboarding/ExpectationsScreen';
 import { AIConsentScreen } from './src/screens/onboarding/AIConsentScreen';
 import { CalculatingScreen } from './src/screens/onboarding/CalculatingScreen';
+import { LoadingAnalysisScreen } from './src/screens/onboarding/LoadingAnalysisScreen';
+import { AnalysisScreen } from './src/screens/onboarding/AnalysisScreen';
 import { AnalysisCompleteScreen } from './src/screens/onboarding/AnalysisCompleteScreen';
 import { HomeScreen } from './src/screens/main/HomeScreen';
 import { OracleScreen } from './src/screens/main/OracleScreen';
-import { MapScreen } from './src/screens/main/MapScreen';
+import { ForecastScreen } from './src/screens/main/ForecastScreen';
 import { ProfileScreen } from './src/screens/main/ProfileScreen';
 import { VaultScreen } from './src/screens/main/VaultScreen';
 import { ConnectionReadingScreen } from './src/screens/main/ConnectionReadingScreen';
@@ -34,7 +32,7 @@ import { DateEnergyScreen } from './src/screens/main/DateEnergyScreen';
 import { HomeEnergyScreen } from './src/screens/main/HomeEnergyScreen';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from './src/constants/Colors';
-import { Home, Sparkles, LayoutGrid, User, Lock } from 'lucide-react-native';
+import { Home, Sparkles, LayoutGrid, User, Heart, Compass } from 'lucide-react-native';
 import { UserProvider, useUser } from './src/context/UserContext';
 import { VaultProvider } from './src/context/VaultContext';
 import { useRevenueCat } from './src/context/RevenueCatContext';
@@ -45,8 +43,7 @@ import { PrivacyPolicyScreen } from './src/screens/legal/PrivacyPolicyScreen';
 import { TermsOfUseScreen } from './src/screens/legal/TermsOfUseScreen';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { PostHogProvider } from 'posthog-react-native';
-
+import { PostHogProvider, usePostHog } from 'posthog-react-native';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -58,7 +55,7 @@ function MainTabNavigator({ route }: any) {
   const tabLabel = (name: string) => {
     if (name === 'Home') return t('tabHome');
     if (name === 'Oracle') return t('tabOracle');
-    if (name === 'Map') return t('tabToolkit');
+    if (name === 'Forecast') return t('tabForecast') || 'Forecast';
     if (name === 'Vault') return t('tabVault');
     if (name === 'Profile') return t('tabProfile');
     return name;
@@ -83,8 +80,8 @@ function MainTabNavigator({ route }: any) {
           let icon;
           if (r.name === 'Home') icon = <Home color={color} size={size} />;
           else if (r.name === 'Oracle') icon = <Sparkles color={color} size={size} />;
-          else if (r.name === 'Map') icon = <LayoutGrid color={color} size={size} />;
-          else if (r.name === 'Vault') icon = <Lock color={color} size={size} />;
+          else if (r.name === 'Forecast') icon = <Compass color={color} size={size} />;
+          else if (r.name === 'Vault') icon = <Heart color={color} size={size} />;
           else icon = <User color={color} size={size} />;
           return <View pointerEvents="none">{icon}</View>;
         },
@@ -100,8 +97,8 @@ function MainTabNavigator({ route }: any) {
         component={OracleScreen}
         initialParams={{ lifePath: results.lifePath, language: results.language }}
       />
-      <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="Vault" component={VaultScreen} />
+      <Tab.Screen name="Forecast" component={ForecastScreen} />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
@@ -112,6 +109,44 @@ function MainTabNavigator({ route }: any) {
 }
 
 const MainTabs = (props: any) => <MainTabNavigator {...props} />;
+
+/**
+ * PostHog's built-in screen autocapture calls useNavigationState above the stack (invalid on RN v7+).
+ * We disable captureScreens on the provider and forward route changes here instead.
+ */
+function PostHogNavigationContainer({
+    navigationRef,
+    children,
+}: {
+    navigationRef: React.RefObject<any>;
+    children: React.ReactNode;
+}) {
+    const posthog = usePostHog();
+
+    const trackCurrentRoute = useCallback(() => {
+        const nav = navigationRef.current;
+        try {
+            if (nav && typeof nav.isReady === 'function' && !nav.isReady()) return;
+        } catch {
+            return;
+        }
+        const route = nav?.getCurrentRoute?.();
+        if (route?.name) {
+            void posthog.screen(route.name, route.params);
+        }
+    }, [navigationRef, posthog]);
+
+    return (
+        <NavigationContainer
+            ref={navigationRef}
+            onReady={trackCurrentRoute}
+            onStateChange={trackCurrentRoute}
+        >
+            {children}
+        </NavigationContainer>
+    );
+}
+
 const CalculatingScreenWrapper = ({ route, navigation }: any) => {
   const { userData } = route.params || {};
   if (!userData) {
@@ -135,8 +170,8 @@ const AppContent = (props: { navigationRef: any }) => {
   const userDataRef = useRef(userData);
   userDataRef.current = userData;
 
-  const { userProfile, numerologyResults, isLoading: isUserLoading } = useUser();
-  const { isLoading: isRcLoading } = useRevenueCat();
+  const { userProfile, numerologyResults, onboardingResume, isLoading: isUserLoading } = useUser();
+  const { isLoading: isRcLoading, isPro } = useRevenueCat();
   const [splashFinished, setSplashFinished] = useState(false);
 
   // Buffer heavy context changes to avoid UI lockup during startup
@@ -149,24 +184,25 @@ const AppContent = (props: { navigationRef: any }) => {
 
   // Memoize stable component references to prevent unmounting on AppContent re-renders
   const WelcomeComponent = useMemo(() => (props: any) => (
-    <WelcomeScreen onStart={() => props.navigation.navigate('Language')} />
+    <WelcomeScreen onStart={() => props.navigation.navigate('OnboardingFlow')} />
   ), []);
+
+  const OnboardingFlowComponent = useMemo(
+    () => (props: any) => <OnboardingFlowScreen navigation={props.navigation} />,
+    [],
+  );
 
   const LanguageComponent = useMemo(() => (props: any) => (
     <LanguageScreen
-      onBack={() => props.navigation.navigate('Welcome')}
+      onBack={() => {
+        if (typeof props.navigation?.canGoBack === 'function' && props.navigation.canGoBack()) {
+          props.navigation.goBack();
+        } else {
+          props.navigation.navigate('Welcome');
+        }
+      }}
       onContinue={(lang: any) => {
         setUserData((prev: any) => ({ ...prev, language: lang }));
-        props.navigation.navigate('Identity');
-      }}
-    />
-  ), []);
-
-  const IdentityComponent = useMemo(() => (props: any) => (
-    <IdentityScreen
-      onBack={() => props.navigation.navigate('Language')}
-      onContinue={(identity: any) => {
-        setUserData((prev: any) => ({ ...prev, identity }));
         props.navigation.navigate('Name');
       }}
     />
@@ -174,43 +210,31 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const NameComponent = useMemo(() => (props: any) => (
     <NameScreen
-      onBack={() => props.navigation.navigate('Identity')}
-      onContinue={(name: any) => {
+      onBack={() => props.navigation.navigate('Language')}
+      onContinue={(name: string) => {
         setUserData((prev: any) => ({ ...prev, name }));
-        props.navigation.navigate('BirthTime');
+        props.navigation.navigate('Identity');
       }}
     />
   ), []);
 
-  const BirthTimeComponent = useMemo(() => (props: any) => (
-    <BirthTimeScreen
+  const IdentityComponent = useMemo(() => (props: any) => (
+    <IdentityScreen
       onBack={() => props.navigation.navigate('Name')}
-      onContinue={(knowsTime: any) => {
-        if (knowsTime) {
-          props.navigation.navigate('EnterBirthTime');
-        } else {
-          setUserData((prev: any) => ({ ...prev, knowsBirthTime: false }));
-          props.navigation.navigate('Relationship');
-        }
+      onContinue={(identity: string) => {
+        setUserData((prev: any) => ({ ...prev, identity }));
+        props.navigation.navigate('Birthdate');
       }}
     />
   ), []);
 
-  const EnterBirthTimeComponent = useMemo(() => (props: any) => (
-    <EnterBirthTimeScreen
-      onBack={() => props.navigation.navigate('BirthTime')}
-      onContinue={(timeString: string) => {
-        setUserData((prev: any) => ({ ...prev, knowsBirthTime: true, birthTime: timeString }));
-        props.navigation.navigate('Relationship');
-      }}
-    />
-  ), []);
-
-  const RelationshipComponent = useMemo(() => (props: any) => (
-    <RelationshipScreen
-      onBack={() => props.navigation.navigate('BirthTime')}
-      onContinue={(status: any) => {
-        setUserData((prev: any) => ({ ...prev, relationshipStatus: status }));
+  const BirthdateComponent = useMemo(() => (props: any) => (
+    <BirthdateScreen
+      onBack={() => props.navigation.navigate('Identity')}
+      onContinue={(date: any) => {
+        const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
+        const birthdate = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        setUserData((prev: any) => ({ ...prev, birthdate }));
         props.navigation.navigate('Focus');
       }}
     />
@@ -218,7 +242,7 @@ const AppContent = (props: { navigationRef: any }) => {
 
   const FocusComponent = useMemo(() => (props: any) => (
     <FocusScreen
-      onBack={() => props.navigation.navigate('Relationship')}
+      onBack={() => props.navigation.navigate('Birthdate')}
       onContinue={(focus: any) => {
         setUserData((prev: any) => ({ ...prev, focus }));
         props.navigation.navigate('Challenge');
@@ -230,40 +254,7 @@ const AppContent = (props: { navigationRef: any }) => {
     <ChallengeScreen
       onBack={() => props.navigation.navigate('Focus')}
       onContinue={(challenge: any) => {
-        setUserData((prev: any) => ({ ...prev, challenge }));
-        props.navigation.navigate('Expectations');
-      }}
-    />
-  ), []);
-
-  const ExpectationsComponent = useMemo(() => (props: any) => (
-    <ExpectationsScreen
-      onBack={() => props.navigation.navigate('Challenge')}
-      onContinue={(expectations: any) => {
-        setUserData((prev: any) => ({ ...prev, expectations }));
-        props.navigation.navigate('Birthdate');
-      }}
-    />
-  ), []);
-
-  const BirthdateComponent = useMemo(() => (props: any) => (
-    <BirthdateScreen
-      onBack={() => props.navigation.navigate('Expectations')}
-      onContinue={(date: any) => {
-        const y = date.getFullYear(), m = date.getMonth() + 1, d = date.getDate();
-        const birthdate = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const fullData = { ...userDataRef.current, birthdate };
-        setUserData(fullData);
-        props.navigation.navigate('PlaceOfBirth');
-      }}
-    />
-  ), []);
-
-  const PlaceOfBirthComponent = useMemo(() => (props: any) => (
-    <PlaceOfBirthScreen
-      onBack={() => props.navigation.navigate('Birthdate')}
-      onContinue={(place: { country: string; city: string }) => {
-        const fullData = { ...userDataRef.current, birthCountry: place.country, birthCity: place.city };
+        const fullData = { ...userDataRef.current, challenge };
         setUserData(fullData);
         props.navigation.navigate('AIConsent', { userData: fullData });
       }}
@@ -274,7 +265,7 @@ const AppContent = (props: { navigationRef: any }) => {
     const { userData: consentUserData } = (props.route.params || {}) as { userData?: any };
     return (
       <AIConsentScreen
-        onBack={() => props.navigation.navigate('PlaceOfBirth')}
+        onBack={() => props.navigation.navigate('Challenge')}
         onContinue={() => {
           if (consentUserData) {
             props.navigation.navigate('Calculating', { userData: consentUserData });
@@ -285,7 +276,19 @@ const AppContent = (props: { navigationRef: any }) => {
   }, []);
 
   const hasPersistedData = useMemo(() => !!(userProfile && numerologyResults), [userProfile, numerologyResults]);
-  const initialRouteName = hasPersistedData ? "MainTabs" : "Welcome";
+  const initialRouteName = useMemo(() => {
+    if (hasPersistedData) return 'MainTabs';
+    if (onboardingResume.active && !isPro) return 'Paywall';
+    return 'Welcome';
+  }, [hasPersistedData, onboardingResume.active, isPro]);
+
+  const paywallInitialParams = useMemo(
+    () =>
+      !hasPersistedData && onboardingResume.active && !isPro
+        ? ({ variant: 'onboarding' } as const)
+        : undefined,
+    [hasPersistedData, onboardingResume.active, isPro],
+  );
 
   // Prepare params if we have persisted data
   const initialParams = useMemo(() => hasPersistedData ? {
@@ -300,13 +303,13 @@ const AppContent = (props: { navigationRef: any }) => {
   }
 
   return (
-    <NavigationContainer ref={props.navigationRef}>
+    <PostHogProvider
+      apiKey="phc_G1OHDdBWXP8y3gY38h5Q4trJXLjTuKtd3WtYeDHf5yc"
+      options={{ host: 'https://us.i.posthog.com' }}
+      autocapture={{ captureScreens: false, captureTouches: false }}
+    >
       <StatusBar style="light" />
-      <PostHogProvider
-        apiKey="phc_G1OHDdBWXP8y3gY38h5Q4trJXLjTuKtd3WtYeDHf5yc"
-        options={{ host: 'https://us.i.posthog.com' }}
-        autocapture
-      >
+      <PostHogNavigationContainer navigationRef={props.navigationRef}>
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
@@ -315,17 +318,15 @@ const AppContent = (props: { navigationRef: any }) => {
           initialRouteName={initialRouteName}
         >
         <Stack.Screen name="Welcome" component={WelcomeComponent} />
+        <Stack.Screen name="OnboardingFlow" component={OnboardingFlowComponent} />
+        <Stack.Screen name="LoadingAnalysis" component={LoadingAnalysisScreen} />
+        <Stack.Screen name="Analysis" component={AnalysisScreen} />
         <Stack.Screen name="Language" component={LanguageComponent} />
-        <Stack.Screen name="Identity" component={IdentityComponent} />
         <Stack.Screen name="Name" component={NameComponent} />
-        <Stack.Screen name="BirthTime" component={BirthTimeComponent} />
-        <Stack.Screen name="EnterBirthTime" component={EnterBirthTimeComponent} />
-        <Stack.Screen name="Relationship" component={RelationshipComponent} />
+        <Stack.Screen name="Identity" component={IdentityComponent} />
+        <Stack.Screen name="Birthdate" component={BirthdateComponent} />
         <Stack.Screen name="Focus" component={FocusComponent} />
         <Stack.Screen name="Challenge" component={ChallengeComponent} />
-        <Stack.Screen name="Expectations" component={ExpectationsComponent} />
-        <Stack.Screen name="Birthdate" component={BirthdateComponent} />
-        <Stack.Screen name="PlaceOfBirth" component={PlaceOfBirthComponent} />
         <Stack.Screen name="AIConsent" component={AIConsentComponent} />
         <Stack.Screen name="Calculating" component={CalculatingScreenWrapper} />
         <Stack.Screen name="AnalysisComplete" component={AnalysisCompleteScreen} />
@@ -333,7 +334,12 @@ const AppContent = (props: { navigationRef: any }) => {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="TermsOfUse" component={TermsOfUseScreen} />
-        <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="Paywall"
+          component={PaywallScreen}
+          options={{ presentation: 'modal' }}
+          {...(paywallInitialParams ? { initialParams: paywallInitialParams } : {})}
+        />
         <Stack.Screen name="PhoneNumberEnergy" component={PhoneNumberEnergyScreen} />
         <Stack.Screen name="NameEnergy" component={NameEnergyScreen} />
         <Stack.Screen name="DateEnergy" component={DateEnergyScreen} />
@@ -344,14 +350,15 @@ const AppContent = (props: { navigationRef: any }) => {
           initialParams={initialParams}
         />
       </Stack.Navigator>
-      </PostHogProvider>
-    </NavigationContainer>
+      </PostHogNavigationContainer>
+    </PostHogProvider>
   );
 };
 
 
 import * as Notifications from 'expo-notifications';
-import { configureNotificationHandler } from './src/utils/notifications';
+import { configureNotificationHandler, type NotificationScreen } from './src/utils/notifications';
+import { initializeMetaAppEvents } from './src/analytics/metaAppEvents';
 
 configureNotificationHandler();
 
@@ -359,14 +366,34 @@ export default function App() {
   const navigationRef = React.useRef<any>(null);
 
   React.useEffect(() => {
-    // Handle notification click
+    initializeMetaAppEvents();
+  }, []);
+
+  React.useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      // Navigate to Home tab when notification is tapped
-      if (navigationRef.current) {
-        navigationRef.current.navigate('MainTabs', {
-          screen: 'Home',
-          params: { openDailyInsight: true }
-        });
+      if (!navigationRef.current) return;
+
+      const data = response.notification.request.content.data as {
+        screen?: NotificationScreen;
+        openDailyInsight?: boolean;
+      };
+
+      const target: NotificationScreen = data?.screen ?? 'Home';
+
+      switch (target) {
+        case 'Vault':
+          navigationRef.current.navigate('MainTabs', { screen: 'Vault' });
+          break;
+        case 'Oracle':
+          navigationRef.current.navigate('MainTabs', { screen: 'Oracle' });
+          break;
+        case 'Home':
+        default:
+          navigationRef.current.navigate('MainTabs', {
+            screen: 'Home',
+            params: { openDailyInsight: data?.openDailyInsight ?? false },
+          });
+          break;
       }
     });
 
@@ -380,7 +407,9 @@ export default function App() {
           <UserProvider>
             <VaultProvider>
               <SettingsProvider>
-                <AppContent navigationRef={navigationRef} />
+                <View style={{ flex: 1 }}>
+                  <AppContent navigationRef={navigationRef} />
+                </View>
               </SettingsProvider>
             </VaultProvider>
           </UserProvider>

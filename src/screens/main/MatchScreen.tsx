@@ -9,7 +9,6 @@ import { Button } from '../../components/ui/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Heart, Sparkles, ArrowLeft, Lock } from 'lucide-react-native';
 import { AIService } from '../../services/ai';
-import { touchDebug } from '../../utils/touchDebug';
 import { useSettings } from '../../context/SettingsContext';
 import { localeForLanguage } from '../../utils/translations';
 import { useRevenueCat } from '../../context/RevenueCatContext';
@@ -69,7 +68,6 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     const handleStartScan = async () => {
-        touchDebug("MatchStartScanPressed");
         setStep('scanning');
         scanRotation.value = 0;
         scanRotation.value = withRepeat(
@@ -79,8 +77,8 @@ export const MatchScreen: React.FC<Props> = ({ route, navigation }) => {
         );
 
         try {
-            const personalization = (userProfile?.identity || userProfile?.relationshipStatus)
-                ? { identity: userProfile?.identity, relationshipStatus: userProfile?.relationshipStatus }
+            const personalization = userProfile?.identity
+                ? { identity: userProfile?.identity }
                 : undefined;
             const result = await AIService.calculateCompatibility(lifePath, partnerDate.toISOString(), language, personalization);
             setAnalysis(result);
